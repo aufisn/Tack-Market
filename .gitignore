@@ -1,0 +1,10 @@
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Exported game files (saves and trade logs downloaded from the game)
+tackmarket-save-*.json
+tackmarket-trades-*.csv
