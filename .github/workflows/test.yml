@@ -1,0 +1,27 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build single-file game
+        run: sh build.sh
+      - name: Check the committed game file is up to date with src/
+        run: |
+          if ! git diff --quiet -- index.html TackMarket-V3.html; then
+            echo "index.html / TackMarket-V3.html are out of date. Run 'sh build.sh' and commit the result." >&2
+            git diff --stat -- index.html TackMarket-V3.html
+            exit 1
+          fi
+      - name: Core tests (engine, broker, bots, analytics, game)
+        run: node tests/core-test.js
+      - name: Market calibration report
+        run: node tests/calibrate.js
