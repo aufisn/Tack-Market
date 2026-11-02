@@ -41,6 +41,7 @@
   ];
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const narrow = () => !!(window.matchMedia && matchMedia('(max-width: 599px)').matches);
+  const paned = () => !!(window.matchMedia && matchMedia('(max-width: 1099px)').matches);
   const storageOK = (() => { try { localStorage.setItem(KEY + 'probe', '1'); localStorage.removeItem(KEY + 'probe'); return true; } catch (e) { return false; } })();
 
   function blankTicket() {
@@ -237,7 +238,7 @@
     if (g.status !== 'active') onSessionEnd();
     saveGame();
     render();
-    if (narrow()) window.scrollTo(0, 0);
+    if (paned()) window.scrollTo(0, 0);
   }
   function setBind(path, el) {
     const [root, key] = path.split('.');
@@ -276,7 +277,7 @@
     sel(sym) {
       App.ui.sel = sym; App.ui.hover = null;
       const tk = App.ui.ticket; tk.limit = tk.stop = tk.sl = tk.tp = tk.planStop = '';
-      if (narrow() && App.ui.pane !== 'ticket') { App.ui.pane = 'chart'; render(); window.scrollTo(0, 0); return; }
+      if (paned() && App.ui.pane !== 'ticket') { App.ui.pane = 'chart'; render(); window.scrollTo(0, 0); return; }
       render();
     },
     pane(arg) { App.ui.pane = arg; render(); window.scrollTo(0, 0); },
@@ -364,7 +365,7 @@
       const a2 = atr(i, g.t, 14) * 2, last = W().c[i][g.t];
       App.ui.ticket = Object.assign(blankTicket(), { side: p.qty > 0 ? 'sell' : 'buy', type: 'stop', tif: 'gtc', qty: String(Math.abs(p.qty)), stop: TM.r2(p.qty > 0 ? last - a2 : last + a2).toFixed(2), tag: 'Hedge' });
       toast('Ticket prefilled with a protective GTC stop 2 ATR away. Adjust and queue it.');
-      if (narrow()) App.ui.pane = 'ticket';
+      if (paned()) App.ui.pane = 'ticket';
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -465,12 +466,12 @@
       <div class="brand" data-act="home" title="Home">TACK<small>V3</small></div>
       <div class="stat"><b>${F.date(t)}</b><span>Day ${t - w.start} of ${g.days} · ${active ? 'after the close' : 'session ended'}</span></div>
       <div class="stat hide-md hide-sm"><b>${esc(TM.sessionLabel(g))}</b><span>${g.margin ? 'margin' : 'cash'} account${g.hidden ? ' · market type hidden' : ''}</span></div>
-      <div class="stat hide-sm"><b>${w.tmx[t].toFixed(1)} <span class="${cls(tmxCh)}">${F.spct(tmxCh, 2)}</span></b><span>TMX index</span></div>
+      <div class="stat hide-md"><b>${w.tmx[t].toFixed(1)} <span class="${cls(tmxCh)}">${F.spct(tmxCh, 2)}</span></b><span>TMX index</span></div>
       <div class="spacer"></div>
       <div class="stat"><b>${F.money(eq)}</b><span>Equity</span></div>
       <div class="stat"><b class="${cls(eq - prev)}">${F.smoney(eq - prev)}</b><span>Day P&amp;L</span></div>
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
-      <div class="stat hide-sm"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
+      <div class="stat hide-md"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
       <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
       ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
@@ -527,7 +528,7 @@
       <span class="nm">${esc(r.s.name)}</span>
       <span class="ch ${cls(r.ch)}">${sort === 'volume' ? (r.vr).toFixed(1) + 'x vol' : sort === 'upside' ? F.spct(r.up, 0) + ' tgt' : F.spct(r.ch, 2)}</span>
     </div>`).join('');
-    return `<div class="watch-head"><div class="row"><span class="label grow">Market · 40 stocks + index fund ${q('watchlist', 'market list')}</span>
+    return `<div class="watch-head"><div class="row"><span class="label grow" title="40 stocks plus the TMXI index fund">Market ${q('watchlist', 'market list')}</span>
       <select data-bind="ui.sort" data-rerender="1" style="width:auto;padding:2px 4px;font-size:12px" aria-label="Sort">
         ${[['sector', 'Sector'], ['change', 'Day change'], ['volume', 'Volume vs avg'], ['upside', 'Analyst upside'], ['name', 'Ticker']].map(([k, v]) => `<option value="${k}" ${sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="filters">${['All'].concat(w.secNames).map((s) => `<button class="${App.ui.sector === s ? 'on' : ''}" data-act="sector" data-arg="${s}">${s === 'All' ? 'All' : `<span class="dot" style="background:${SEC_COLOR[s]};width:6px;height:6px"></span> ${s}`}</button>`).join('')}</div></div>
@@ -557,7 +558,7 @@
     return `<div class="panel">
       <div class="chart-head"><span class="dot" style="background:${SEC_COLOR[s.sector]}"></span><h2 class="mono">${s.sym}</h2><span class="muted">${esc(s.name)}</span>
         <span class="big">${F.px(last)}</span><span class="mono ${cls(ch1)}">${F.smoney(last - w.c[i][t - 1], 2)} (${F.spct(ch1, 2)})</span>
-        <button class="btn sm primary show-xs" style="margin-left:auto" data-act="pane" data-arg="ticket">Trade ${s.sym}</button></div>
+        <button class="btn sm primary show-md" style="margin-left:auto" data-act="pane" data-arg="ticket">Trade ${s.sym}</button></div>
       <div class="chart-tools"><span class="small faint grow">${esc(s.blurb)}</span>
         <div class="seg">${[[63, '3M'], [126, '6M'], [250, '1Y']].map(([n, l]) => `<button class="${App.ui.range === n ? 'on' : ''}" data-act="range" data-arg="${n}">${l}</button>`).join('')}</div>
         ${q('chart', 'reading the chart')}<div class="seg"><button class="${App.ui.sma20 ? 'on' : ''}" data-act="toggle" data-arg="sma20">SMA20</button><button class="${App.ui.sma50 ? 'on' : ''}" data-act="toggle" data-arg="sma50">SMA50</button><button class="${App.ui.showVol ? 'on' : ''}" data-act="toggle" data-arg="showVol">Vol</button></div></div>
@@ -800,8 +801,8 @@
       <section class="chartcol pane pane-chart">${viewChart()}</section>
       <aside class="ticket panel pane pane-ticket">${viewTicket()}</aside>
       <section class="tabs panel pane pane-tabs">${viewTabs()}</section></div>
-      <nav class="mnav" aria-label="Sections">${nav.map(([k, ic, l]) => `<button class="nav ${pane === k ? 'on' : ''}" data-act="pane" data-arg="${k}" aria-current="${pane === k}"><i aria-hidden="true">${ic}</i>${l}</button>`).join('')}
-      ${active ? '<button class="btn primary" data-act="next">Next day ▸</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
+      <nav class="mnav" aria-label="Sections">${nav.map(([k, ic, l]) => `<button class="nav nav-${k === 'watch' ? 'market' : k} ${pane === k || (k === 'chart' && pane === 'watch' && !narrow()) ? 'on' : ''}" data-act="pane" data-arg="${k}" aria-current="${pane === k}"><i aria-hidden="true">${ic}</i>${l}</button>`).join('')}
+      ${active ? '<button class="btn five" data-act="next5" title="Advance five days">+5</button><button class="btn primary" data-act="next">Next day ▸</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
   }
 
   // ---------- views: end / debrief ----------

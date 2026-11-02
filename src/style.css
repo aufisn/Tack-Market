@@ -97,7 +97,7 @@ tbody tr:hover { background: var(--panel2); }
 
 /* board layout */
 .layout { display: grid; gap: 10px; padding: 10px; grid-template-columns: 280px minmax(0, 1fr) 340px; grid-template-areas: "watch chart ticket" "watch tabs tabs"; align-items: start; }
-.watch { grid-area: watch; position: sticky; top: 62px; max-height: calc(100vh - 72px); display: flex; flex-direction: column; }
+.watch { grid-area: watch; position: sticky; top: calc(var(--tb, 56px) + 8px); max-height: calc(100vh - var(--tb, 56px) - 16px); display: flex; flex-direction: column; }
 .chartcol { grid-area: chart; min-width: 0; }
 .ticket { grid-area: ticket; }
 .tabs { grid-area: tabs; min-width: 0; }
@@ -249,37 +249,48 @@ table.cycle td { border-bottom: 1px solid var(--grid); }
 }
 
 /* ---------- responsive: PC (default), unfolded foldable, folded cover screen ---------- */
-/* Unfolded foldable / tablet (about 600-1099px, near-square): watchlist beside chart + ticket. */
+/* Bottom navigation bar (unfolded foldable, tablet and phone); hidden on PC. */
+.mnav, .show-md, .show-xs { display: none; }
+.mnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 4px; align-items: stretch; background: var(--panel); border-top: 1px solid var(--border); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+.mnav .nav { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+.mnav .nav i { font-style: normal; font-size: 18px; line-height: 1; }
+.mnav .nav.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 2px 0 var(--accent); }
+.mnav .btn { min-height: 50px; }
+.mnav .btn.primary { flex: 1.4; font-size: 14px; }
+.mnav .btn.five { flex: 0.7; font-size: 13px; }
+
+/* Unfolded foldable / tablet (600-1099px): the watchlist stays as a column on the left; the right side
+   shows one panel at a time (Chart, Trade or Portfolio), switched from the bottom bar. */
 @media (max-width: 1099px) {
-  .layout { grid-template-columns: 230px minmax(0, 1fr); grid-template-areas: "watch chart" "watch ticket" "tabs tabs"; padding: 8px; gap: 8px; }
-  .watch { top: 58px; max-height: calc(100vh - 66px); max-height: calc(100dvh - 66px); }
+  .layout { grid-template-columns: 230px minmax(0, 1fr); grid-template-areas: "watch main"; padding: 8px 8px calc(78px + env(safe-area-inset-bottom)); gap: 8px; }
+  .layout > .pane { display: none; grid-area: main; }
+  .layout > .pane-watch { display: flex; grid-area: watch; top: calc(var(--tb, 56px) + 8px); max-height: calc(100vh - var(--tb, 56px) - 96px); max-height: calc(100dvh - var(--tb, 56px) - 96px); }
+  .layout[data-pane="chart"] > .pane-chart, .layout[data-pane="watch"] > .pane-chart,
+  .layout[data-pane="ticket"] > .pane-ticket, .layout[data-pane="tabs"] > .pane-tabs { display: block; }
+  .mnav { display: flex; }
+  .mnav .nav-market { display: none; }
   .topbar { gap: 4px 14px; }
-  .hide-md { display: none !important; }
+  .topbar .act-btns, .hide-md { display: none !important; }
+  .show-md { display: inline-flex; }
+  .tabbody.scroll { max-height: none; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
-/* Folded cover screen / phone (under 600px): one pane at a time with a bottom navigation bar. */
-.mnav, .show-xs { display: none; }
+/* Folded cover screen / phone (under 600px): one pane at a time, including the market list. */
 @media (max-width: 599px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main"; padding: 6px 6px calc(78px + env(safe-area-inset-bottom)); }
-  .layout > .pane { display: none; grid-area: main; }
+  .layout > .pane-watch { display: none; grid-area: main; position: static; max-height: none; }
   .layout[data-pane="watch"] > .pane-watch { display: flex; }
-  .layout[data-pane="chart"] > .pane-chart, .layout[data-pane="ticket"] > .pane-ticket, .layout[data-pane="tabs"] > .pane-tabs { display: block; }
-  .watch { position: static; max-height: none; }
+  .layout[data-pane="watch"] > .pane-chart { display: none; }
+  .mnav .nav-market { display: flex; }
   .watch-list { overflow: visible; }
   .topbar { padding: 6px 10px; gap: 2px 12px; }
-  .topbar .act-btns, .hide-sm { display: none !important; }
+  .hide-sm { display: none !important; }
   .show-xs { display: inline-flex; }
   .stat b { font-size: 13px; }
-  .mnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 4px; align-items: stretch; background: var(--panel); border-top: 1px solid var(--border); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
-  .mnav .nav { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
-  .mnav .nav i { font-style: normal; font-size: 18px; line-height: 1; }
-  .mnav .nav.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 2px 0 var(--accent); }
-  .mnav .btn.primary { flex: 1.4; min-height: 50px; font-size: 14px; }
   #priceChart { height: 260px; }
   .profile { grid-template-columns: 1fr 1fr; }
-  .tabbody.scroll { max-height: none; }
   .chart-head .big { font-size: 20px; }
   .banner { margin: 6px 6px 0; }
-  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .home { padding: 14px 10px 30px; }
   .hero h1 { font-size: 24px; }
 }
