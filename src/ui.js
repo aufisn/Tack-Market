@@ -251,7 +251,16 @@
   }
 
   const ACTIONS = {
-    home() { App.screen = 'home'; render(); },
+    home() {
+      const wasActive = App.screen === 'game' && App.game && App.game.status === 'active';
+      App.screen = 'home'; render(); window.scrollTo(0, 0);
+      if (wasActive) toast('Your session is still running. Tap Continue session to return.');
+    },
+    endFromHome() {
+      if (!App.game || App.game.status !== 'active') return;
+      if (!confirm(App.game.mode === 'level' ? 'End this level attempt now? It will count as a fail.' : 'End this session now and see the debrief?')) return;
+      TM.endEarly(W(), G()); onSessionEnd(); saveGame(); render(); window.scrollTo(0, 0);
+    },
     theme() { const cur = App.progress.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); App.progress.theme = cur === 'dark' ? 'light' : 'dark'; saveProgress(); applyTheme(); render(); },
     resume() { if (App.game) { App.screen = App.game.status === 'active' ? 'game' : 'end'; render(); } },
     practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed }); },
@@ -414,8 +423,9 @@
       <div class="hero"><div><h1>TACK MARKET <small>V3</small></h1>
         <p>A trading simulator with realistic, fictional markets. Real-world frictions, risk rules and an honest debrief, so you can make your mistakes here instead of with real money.</p></div>
         <div class="row"><label class="small muted">Your name <input type="text" maxlength="24" value="${esc(pr.name)}" data-bind="name.x" style="width:140px;margin-left:6px"></label><button class="btn sm" data-act="help" data-arg="start">? Help guide</button><button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐ Theme</button></div></div>
+      ${active ? `<div class="panel pad continue resume"><div><div class="label" style="color:var(--accent)">Session in progress</div><b style="font-size:16px">${esc(TM.sessionLabel(saved))}</b><div class="small muted">Day ${saved.t - 250} of ${saved.days} · equity ${F.money(saved.player.equity[saved.player.equity.length - 1].eq)}</div></div>
+        <div class="row"><button class="btn sell" data-act="endFromHome">End now</button><button class="btn primary" data-act="resume">Continue session ▸</button></div></div>` : ''}
       ${storageOK ? '' : '<div class="panel pad continue" style="border-color:var(--down)"><div><b>This browser is blocking storage</b><div class="small muted">Progress will not be kept between visits. Open the file in Chrome or Samsung Internet directly, or use Account &gt; Export save before closing.</div></div></div>'}
-      ${active ? `<div class="panel pad continue"><div><b>Session in progress</b><div class="small muted">${esc(TM.sessionLabel(saved))} · day ${saved.t - 250} of ${saved.days}</div></div><button class="btn primary" data-act="resume">Continue</button></div>` : ''}
       <div class="cards">
         <section class="panel pad card"><h3>Practice ${q('practice', 'practice settings')}</h3><div class="sub">Pick the market type and account, then trade freely. Rules warn but don't block.</div>
           <label class="f"><span>Market scenario</span><select data-bind="practice.scenario" data-rerender="1">${Object.entries(TM.SCENARIOS).map(([k, v]) => `<option value="${k}" ${p.scenario === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
@@ -458,6 +468,7 @@
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
       <div class="stat hide-sm"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
       <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
+      ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
       <button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐</button>
     </header>`;
@@ -843,7 +854,7 @@
   }
   const helpSection = (sec, opts) => `<section class="panel pad help-sec" id="h-${sec.id}">
     <div class="row"><h2 class="grow">${esc(sec.title)}</h2>${opts && opts.open ? `<button class="btn sm noprint" data-act="helpGo" data-arg="${sec.id}">Open section</button>` : ''}</div>
-    ${sec.intro && !(opts && opts.open) ? `<p class="muted">${sec.intro}</p>` : ''}
+    ${sec.intro && !(opts && opts.open) ? `<div class="muted help-intro">${sec.intro}</div>` : ''}
     <dl class="glossary">${sec.items.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl></section>`;
   function viewHelpBody() {
     if (App.ui.helpPrintAll) return TM.HELP.map((sec) => helpSection(sec)).join('');

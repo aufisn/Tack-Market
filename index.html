@@ -200,6 +200,11 @@ canvas { display: block; width: 100%; }
 .badge { display: inline-block; font: 700 10px/16px var(--mono); padding: 0 6px; border-radius: 4px; letter-spacing: .06em; }
 .badge.pass { background: var(--up); color: #fff; } .badge.fail { background: var(--down); color: #fff; } .badge.lock { background: var(--border); color: var(--muted); }
 .continue { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; border-color: var(--accent); }
+.continue.resume { border-width: 2px; background: var(--panel2); }
+.help-intro { margin-bottom: 8px; }
+table.cycle { margin: 10px 0 2px; font-size: 13px; }
+table.cycle th, table.cycle td { padding: 6px 8px; vertical-align: top; color: var(--text); }
+table.cycle td { border-bottom: 1px solid var(--grid); }
 .footer { margin-top: 26px; color: var(--faint); font-size: 12px; text-align: center; }
 .result { text-align: center; padding: 18px 12px 6px; }
 .result .big { font: 800 28px/1.1 var(--mono); letter-spacing: .06em; }
@@ -1730,8 +1735,11 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   TM.HELP = [
     {
       id: 'start', title: 'How a trading day works',
-      intro: 'Tack Market is turn-based. Each turn is one trading day, and you always act after the market has closed.',
+      intro: 'Tack Market is turn-based and works the same way in Practice, Career levels and the Daily challenge. Each turn is one trading day, and <b>whenever you are looking at the screen the market is closed</b>: you always act after the close, like a swing trader planning the next morning in the evening. The market is only \u201copen\u201d inside the <b>Next day</b> step, when the game plays a whole trading day in one go and your orders execute.<table class="cycle"><thead><tr><th>Phase</th><th>What happens</th><th>Who acts</th></tr></thead><tbody><tr><td><b>After the close</b><br><span class="faint">the screen you see</span></td><td>Today\u2019s trading is over. Prices, news and positions are final.</td><td><b>You</b>: study, place, edit or cancel orders</td></tr><tr><td><b>Next day</b><br><span class="faint">button pressed</span></td><td>The next trading day plays out: the <b>open</b>, the moves during the day, then the <b>close</b>. Orders fill along the way.</td><td><b>The market</b></td></tr><tr><td><b>After the next close</b></td><td>You are back on the screen, one day later, with the results.</td><td><b>You</b> again</td></tr></tbody></table>',
       items: [
+        ['Is the market ever open?', 'Not while you are on the screen. Nothing trades in real time, so there is no rush and you cannot react to tomorrow\u2019s prices before committing. You make every decision with the information you would really have at the close.'],
+        ['Day 0 of 60', 'The session has not started. You are looking at the close of the last day of the one-year warm-up history, and nothing you can trade has happened yet. Press <b>Next day</b> once and you are at the close of Day 1. The session ends at the close of the final day (Day 60 here).'],
+        ['Same in every mode', 'Practice, the three Career levels and the Daily challenge all use this day cycle. They differ only in settings, rules and how you are graded.'],
         ['After the close', 'You see every price up to and including today’s close. Nothing you do can change today. Decide what to do tomorrow.'],
         ['Queue orders', 'Build an order in the <b>Trade</b> ticket and press <b>Queue order</b>. It does not execute yet: it waits for tomorrow.'],
         ['Next day', 'Reveals tomorrow. Market orders fill at the <b>open</b>; limit and stop orders fill if and when that day’s price path reaches them. Dividends, interest, fees and margin checks are applied, and every bot trades the same day.'],
@@ -1790,7 +1798,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Drawdown', 'How far your equity is below its highest point so far. 0% means you are at a new high.'],
         ['◐ (theme)', 'Switches between dark and light mode.'],
         ['? (help)', 'Opens this guide at the section that matches where you are.'],
-        ['TACK', 'Tap the logo to go back to the home screen. Your session is saved.']
+        ['TACK', 'Tap the logo to go to the home screen. Your session keeps running in the background: use <b>Continue session</b> at the top of the home screen to return, or <b>End now</b> there to finish it and see the debrief.'],
+        ['End', 'Finishes the session early and goes to the debrief. In a Career level this counts as a failed attempt. The same option is in Account & rules.'],
       ]
     },
     {
@@ -2376,7 +2385,16 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   }
 
   const ACTIONS = {
-    home() { App.screen = 'home'; render(); },
+    home() {
+      const wasActive = App.screen === 'game' && App.game && App.game.status === 'active';
+      App.screen = 'home'; render(); window.scrollTo(0, 0);
+      if (wasActive) toast('Your session is still running. Tap Continue session to return.');
+    },
+    endFromHome() {
+      if (!App.game || App.game.status !== 'active') return;
+      if (!confirm(App.game.mode === 'level' ? 'End this level attempt now? It will count as a fail.' : 'End this session now and see the debrief?')) return;
+      TM.endEarly(W(), G()); onSessionEnd(); saveGame(); render(); window.scrollTo(0, 0);
+    },
     theme() { const cur = App.progress.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); App.progress.theme = cur === 'dark' ? 'light' : 'dark'; saveProgress(); applyTheme(); render(); },
     resume() { if (App.game) { App.screen = App.game.status === 'active' ? 'game' : 'end'; render(); } },
     practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed }); },
@@ -2539,8 +2557,9 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       <div class="hero"><div><h1>TACK MARKET <small>V3</small></h1>
         <p>A trading simulator with realistic, fictional markets. Real-world frictions, risk rules and an honest debrief, so you can make your mistakes here instead of with real money.</p></div>
         <div class="row"><label class="small muted">Your name <input type="text" maxlength="24" value="${esc(pr.name)}" data-bind="name.x" style="width:140px;margin-left:6px"></label><button class="btn sm" data-act="help" data-arg="start">? Help guide</button><button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐ Theme</button></div></div>
+      ${active ? `<div class="panel pad continue resume"><div><div class="label" style="color:var(--accent)">Session in progress</div><b style="font-size:16px">${esc(TM.sessionLabel(saved))}</b><div class="small muted">Day ${saved.t - 250} of ${saved.days} · equity ${F.money(saved.player.equity[saved.player.equity.length - 1].eq)}</div></div>
+        <div class="row"><button class="btn sell" data-act="endFromHome">End now</button><button class="btn primary" data-act="resume">Continue session ▸</button></div></div>` : ''}
       ${storageOK ? '' : '<div class="panel pad continue" style="border-color:var(--down)"><div><b>This browser is blocking storage</b><div class="small muted">Progress will not be kept between visits. Open the file in Chrome or Samsung Internet directly, or use Account &gt; Export save before closing.</div></div></div>'}
-      ${active ? `<div class="panel pad continue"><div><b>Session in progress</b><div class="small muted">${esc(TM.sessionLabel(saved))} · day ${saved.t - 250} of ${saved.days}</div></div><button class="btn primary" data-act="resume">Continue</button></div>` : ''}
       <div class="cards">
         <section class="panel pad card"><h3>Practice ${q('practice', 'practice settings')}</h3><div class="sub">Pick the market type and account, then trade freely. Rules warn but don't block.</div>
           <label class="f"><span>Market scenario</span><select data-bind="practice.scenario" data-rerender="1">${Object.entries(TM.SCENARIOS).map(([k, v]) => `<option value="${k}" ${p.scenario === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
@@ -2583,6 +2602,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
       <div class="stat hide-sm"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
       <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
+      ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
       <button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐</button>
     </header>`;
@@ -2968,7 +2988,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   }
   const helpSection = (sec, opts) => `<section class="panel pad help-sec" id="h-${sec.id}">
     <div class="row"><h2 class="grow">${esc(sec.title)}</h2>${opts && opts.open ? `<button class="btn sm noprint" data-act="helpGo" data-arg="${sec.id}">Open section</button>` : ''}</div>
-    ${sec.intro && !(opts && opts.open) ? `<p class="muted">${sec.intro}</p>` : ''}
+    ${sec.intro && !(opts && opts.open) ? `<div class="muted help-intro">${sec.intro}</div>` : ''}
     <dl class="glossary">${sec.items.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl></section>`;
   function viewHelpBody() {
     if (App.ui.helpPrintAll) return TM.HELP.map((sec) => helpSection(sec)).join('');

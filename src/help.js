@@ -8,8 +8,11 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   TM.HELP = [
     {
       id: 'start', title: 'How a trading day works',
-      intro: 'Tack Market is turn-based. Each turn is one trading day, and you always act after the market has closed.',
+      intro: 'Tack Market is turn-based and works the same way in Practice, Career levels and the Daily challenge. Each turn is one trading day, and <b>whenever you are looking at the screen the market is closed</b>: you always act after the close, like a swing trader planning the next morning in the evening. The market is only \u201copen\u201d inside the <b>Next day</b> step, when the game plays a whole trading day in one go and your orders execute.<table class="cycle"><thead><tr><th>Phase</th><th>What happens</th><th>Who acts</th></tr></thead><tbody><tr><td><b>After the close</b><br><span class="faint">the screen you see</span></td><td>Today\u2019s trading is over. Prices, news and positions are final.</td><td><b>You</b>: study, place, edit or cancel orders</td></tr><tr><td><b>Next day</b><br><span class="faint">button pressed</span></td><td>The next trading day plays out: the <b>open</b>, the moves during the day, then the <b>close</b>. Orders fill along the way.</td><td><b>The market</b></td></tr><tr><td><b>After the next close</b></td><td>You are back on the screen, one day later, with the results.</td><td><b>You</b> again</td></tr></tbody></table>',
       items: [
+        ['Is the market ever open?', 'Not while you are on the screen. Nothing trades in real time, so there is no rush and you cannot react to tomorrow\u2019s prices before committing. You make every decision with the information you would really have at the close.'],
+        ['Day 0 of 60', 'The session has not started. You are looking at the close of the last day of the one-year warm-up history, and nothing you can trade has happened yet. Press <b>Next day</b> once and you are at the close of Day 1. The session ends at the close of the final day (Day 60 here).'],
+        ['Same in every mode', 'Practice, the three Career levels and the Daily challenge all use this day cycle. They differ only in settings, rules and how you are graded.'],
         ['After the close', 'You see every price up to and including today’s close. Nothing you do can change today. Decide what to do tomorrow.'],
         ['Queue orders', 'Build an order in the <b>Trade</b> ticket and press <b>Queue order</b>. It does not execute yet: it waits for tomorrow.'],
         ['Next day', 'Reveals tomorrow. Market orders fill at the <b>open</b>; limit and stop orders fill if and when that day’s price path reaches them. Dividends, interest, fees and margin checks are applied, and every bot trades the same day.'],
@@ -68,7 +71,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Drawdown', 'How far your equity is below its highest point so far. 0% means you are at a new high.'],
         ['◐ (theme)', 'Switches between dark and light mode.'],
         ['? (help)', 'Opens this guide at the section that matches where you are.'],
-        ['TACK', 'Tap the logo to go back to the home screen. Your session is saved.']
+        ['TACK', 'Tap the logo to go to the home screen. Your session keeps running in the background: use <b>Continue session</b> at the top of the home screen to return, or <b>End now</b> there to finish it and see the debrief.'],
+        ['End', 'Finishes the session early and goes to the debrief. In a Career level this counts as a failed attempt. The same option is in Account & rules.'],
       ]
     },
     {
