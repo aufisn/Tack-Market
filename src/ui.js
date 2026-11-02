@@ -472,7 +472,7 @@
       <div class="stat"><b class="${cls(eq - prev)}">${F.smoney(eq - prev)}</b><span>Day P&amp;L</span></div>
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
       <div class="stat hide-md"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
-      <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
+      <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn blue" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
       ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
       <button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐</button>
@@ -802,7 +802,7 @@
       <aside class="ticket panel pane pane-ticket">${viewTicket()}</aside>
       <section class="tabs panel pane pane-tabs">${viewTabs()}</section></div>
       <nav class="mnav" aria-label="Sections">${nav.map(([k, ic, l]) => `<button class="nav nav-${k === 'watch' ? 'market' : k} ${pane === k || (k === 'chart' && pane === 'watch' && !narrow()) ? 'on' : ''}" data-act="pane" data-arg="${k}" aria-current="${pane === k}"><i aria-hidden="true">${ic}</i>${l}</button>`).join('')}
-      ${active ? '<button class="btn five" data-act="next5" title="Advance five days">+5</button><button class="btn primary" data-act="next">Next day ▸</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
+      ${active ? '<button class="btn primary" data-act="next">Next day ▸</button><button class="btn blue five" data-act="next5" title="Advance five days">+5</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
   }
 
   // ---------- views: end / debrief ----------

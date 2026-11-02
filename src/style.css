@@ -1,6 +1,6 @@
 :root {
   --bg: #0b0f14; --panel: #111821; --panel2: #17212c; --border: #243241; --text: #e6edf3; --muted: #9aa7b4; --faint: #66737f;
-  --accent: #f2b544; --accent-ink: #1a1200; --up: #2fbf71; --down: #ef5350; --info: #5aa9e6; --warn: #f2b544; --grid: #1c2733;
+  --accent: #f2b544; --accent-ink: #1a1200; --info-ink: #04121d; --up: #2fbf71; --down: #ef5350; --info: #5aa9e6; --warn: #f2b544; --grid: #1c2733;
   --s-index: #5aa9e6; --s-equal: #a08cf5; --s-momentum: #e46aa4; --s-value: #34b9a8; --s-rules: #a9b25c; --sma20: #c9a23a; --sma50: #8f7cf0;
   --reg-bull: #1f6f47; --reg-chop: #4a5561; --reg-bear: #8a3b3b; --reg-crash: #c62828; --reg-recovery: #2b7f91;
   --shadow: 0 1px 0 rgba(255,255,255,.02), 0 8px 24px rgba(0,0,0,.25);
@@ -11,7 +11,7 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #f3f5f8; --panel: #ffffff; --panel2: #f1f4f7; --border: #d6dde5; --text: #13202c; --muted: #4f5e6c; --faint: #85929f;
-    --accent: #a8690f; --accent-ink: #ffffff; --up: #137a45; --down: #c62828; --info: #1f6fb2; --warn: #a8690f; --grid: #e7ecf1;
+    --accent: #a8690f; --accent-ink: #ffffff; --info-ink: #ffffff; --up: #137a45; --down: #c62828; --info: #1f6fb2; --warn: #a8690f; --grid: #e7ecf1;
     --s-index: #1f6fb2; --s-equal: #6a52d6; --s-momentum: #c23a7a; --s-value: #13867a; --s-rules: #6f7a1e; --sma20: #a8690f; --sma50: #6a52d6;
     --reg-bull: #b9e3c9; --reg-chop: #d5dbe1; --reg-bear: #f1c4c4; --reg-crash: #e57373; --reg-recovery: #b5dde6;
     --shadow: 0 1px 2px rgba(16,24,40,.06), 0 6px 18px rgba(16,24,40,.06);
@@ -20,7 +20,7 @@
 }
 :root[data-theme="light"] {
   --bg: #f3f5f8; --panel: #ffffff; --panel2: #f1f4f7; --border: #d6dde5; --text: #13202c; --muted: #4f5e6c; --faint: #85929f;
-  --accent: #a8690f; --accent-ink: #ffffff; --up: #137a45; --down: #c62828; --info: #1f6fb2; --warn: #a8690f; --grid: #e7ecf1;
+  --accent: #a8690f; --accent-ink: #ffffff; --info-ink: #ffffff; --up: #137a45; --down: #c62828; --info: #1f6fb2; --warn: #a8690f; --grid: #e7ecf1;
   --s-index: #1f6fb2; --s-equal: #6a52d6; --s-momentum: #c23a7a; --s-value: #13867a; --s-rules: #6f7a1e; --sma20: #a8690f; --sma50: #6a52d6;
   --reg-bull: #b9e3c9; --reg-chop: #d5dbe1; --reg-bear: #f1c4c4; --reg-crash: #e57373; --reg-recovery: #b5dde6;
   --shadow: 0 1px 2px rgba(16,24,40,.06), 0 6px 18px rgba(16,24,40,.06);
@@ -51,6 +51,8 @@ p { margin: 0 0 8px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover { filter: brightness(1.08); }
+.btn.blue { background: var(--info); color: var(--info-ink); border-color: var(--info); }
+.btn.blue:hover { filter: brightness(1.08); }
 .btn.buy { background: var(--up); border-color: var(--up); color: #fff; }
 .btn.sell { background: var(--down); border-color: var(--down); color: #fff; }
 .btn.ghost { background: transparent; }
