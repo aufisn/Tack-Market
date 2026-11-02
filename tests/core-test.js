@@ -42,6 +42,25 @@ r = E({ side: 'buy', type: 'limit', limit: 90 }, [100, 101, 97, 99]); ok(r === n
   const res = TM.placeOrder(world, game.player, { sym: 'ARWV', side: 'sell', qty: 10, type: 'market' }, game.t);
   ok(!res.ok, 'cash account short rejected');
 }
+// 4b. queued orders reserve buying power (cash and margin) and commit shares
+for (const margin of [false, true]) {
+  const { game, world } = TM.createGame({ mode: 'practice', seed: 5, days: 60, margin });
+  const a = game.player, t = game.t, px = world.c[world.bySym.NBSF][t];
+  const bp0 = TM.buyingPower(world, a, t);
+  TM.placeOrder(world, a, { sym: 'NBSF', side: 'buy', qty: Math.floor(60000 / px), type: 'market' }, t);
+  const bp1 = TM.buyingPower(world, a, t);
+  ok(bp1 < bp0 - (margin ? 59000 : 59900), `${margin ? 'margin' : 'cash'}: queued buy reserves buying power incl. costs (${bp0.toFixed(0)} -> ${bp1.toFixed(0)})`);
+  const g2 = TM.createGame({ mode: 'practice', seed: 5, days: 60, margin }), b = g2.game.player;
+  TM.placeOrder(g2.world, b, { sym: 'NBSF', side: 'buy', qty: 100, type: 'market' }, g2.game.t);
+  TM.advanceDay(g2.world, g2.game);
+  const s1 = TM.placeOrder(g2.world, b, { sym: 'NBSF', side: 'sell', qty: 100, type: 'limit', limit: 9999 }, g2.game.t);
+  const eff = TM.orderEffect(b, 'NBSF', 'sell', 100);
+  ok(s1.ok && eff.room === 0 && eff.excess === 100, `${margin ? 'margin' : 'cash'}: shares committed to the first queued sell`);
+  const s2 = TM.placeOrder(g2.world, b, { sym: 'NBSF', side: 'sell', qty: 100, type: 'market' }, g2.game.t);
+  if (!margin) ok(!s2.ok, 'cash: second sell of the same shares rejected');
+  else ok(s2.ok && s2.order.opening, 'margin: second sell is treated as an opening short (reserves margin)');
+}
+
 // 5. random trader: accounting identity, no NaN, margin & shorts
 let idBad = 0, nan = 0, calls = 0;
 const botRet = {}, scen = {};

@@ -128,7 +128,8 @@
     const qty = Math.floor(Number(tk.qty));
     const eq = TM.equityAt(w, a, t);
     const held = a.pos[s.sym] ? a.pos[s.sym].qty : 0;
-    const opening = TM.isOpening(a, s.sym, tk.side);
+    const eff = TM.orderEffect(a, s.sym, tk.side, qty > 0 ? qty : 0);
+    const opening = eff.opening;
     const lim = Number(tk.limit), stp = Number(tk.stop);
     const ref = tk.type === 'market' ? last : tk.type === 'limit' ? (lim > 0 ? lim : last) : (stp > 0 ? stp : last);
     const taker = tk.type !== 'limit' || (tk.side === 'buy' ? lim >= last : lim <= last);
@@ -140,13 +141,16 @@
     if (!(qty > 0)) add('block', 'Enter a quantity.');
     if ((tk.type === 'limit' || tk.type === 'stoplimit') && !(lim > 0)) add('block', 'Enter a limit price.');
     if ((tk.type === 'stop' || tk.type === 'stoplimit') && !(stp > 0)) add('block', 'Enter a stop price.');
+    if (!a.margin && tk.side === 'sell' && held > 0 && qty > eff.room && qty <= held) add('block', `Only ${eff.room} of your ${held} shares are free: ${eff.committed} are already committed to queued sell orders. Edit or cancel those first.`);
+    if (a.margin && qty > 0 && eff.closable > 0 && eff.excess > 0) add('warn', `Only ${eff.room} of your ${eff.closable} shares are free (${eff.committed} committed to queued orders). The other ${eff.excess} would open a ${tk.side === 'sell' ? 'short' : 'long'} position.`);
     if (!a.margin && tk.side === 'sell' && qty > Math.max(0, held)) add('block', held > 0 ? `You hold ${held}. A cash account cannot go short.` : 'A cash account cannot sell short. Choose a margin account in Practice settings to short.');
     if (opening && a.lockoutT === t) add('block', 'Cool-off after hitting your daily loss limit: no new positions until tomorrow.');
     if (qty > 0) {
       const notional = qty * ref;
       if (opening) {
         const bp = TM.buyingPower(w, a, t);
-        if (notional > bp * 1.0001) add('block', `Needs ${F.money(notional)} but buying power is ${F.money(bp)}${a.margin ? ' (50% initial margin)' : ''}.`);
+        const need = notional + (est ? est.total : 0);
+        if (need > bp * 1.0001) add('block', `Needs ${F.money(need)} including estimated costs, but buying power is ${F.money(bp)}${a.margin ? ' (50% initial margin)' : ''}.`);
         const newQty = held + (tk.side === 'buy' ? qty : -qty);
         const posW = Math.abs(newQty) * ref / eq;
         if (rules.maxPosPct && posW > rules.maxPosPct / 100) add(enforce, `Position would be ${F.pct(posW, 0)} of equity (your limit is ${rules.maxPosPct}%).`);
@@ -287,8 +291,8 @@
     newsMine() { App.ui.newsMine = !App.ui.newsMine; render(); },
     maxQty() {
       const w = W(), g = G(), i = idx(App.ui.sel), tk = App.ui.ticket, t = g.t;
-      const held = g.player.pos[App.ui.sel] ? g.player.pos[App.ui.sel].qty : 0;
-      if (!TM.isOpening(g.player, App.ui.sel, tk.side)) tk.qty = String(Math.abs(held));
+      const eff = TM.orderEffect(g.player, App.ui.sel, tk.side, 0);
+      if (eff.closable > 0) tk.qty = String(eff.room);
       else tk.qty = String(Math.max(0, Math.floor(TM.buyingPower(w, g.player, t) * 0.98 / w.c[i][t])));
       render();
     },
@@ -571,7 +575,7 @@
     const typeHelp = { market: 'Fills at the next open, plus spread and impact. Overnight gaps can move it far from today’s close.', limit: 'Buy at or below / sell at or above your price. You may not get filled.', stop: 'Becomes a market order once price trades through the stop. Gaps can fill you well past it.', stoplimit: 'Triggers at the stop, then only fills at your limit or better. In a gap it may not fill at all.' };
     const sellLabel = a.margin ? (p && p.qty > 0 ? 'Sell' : 'Sell short') : 'Sell';
     return `<div class="pad"><div class="row"><span class="label grow">Order ticket ${q('ticket', 'order ticket')}</span><span class="mono small">${s.sym} $${F.px(last)}</span></div>
-      <div class="small muted" style="margin:6px 0 8px">${p ? `You are ${p.qty > 0 ? 'long' : 'short'} ${Math.abs(p.qty)} @ $${F.px(p.avg)} · <span class="${cls((last - p.avg) * p.qty)}">${F.smoney((last - p.avg) * p.qty)}</span>` : 'No position.'} Buying power ${F.money(TM.buyingPower(w, a, t))}</div>
+      <div class="small muted" style="margin:6px 0 8px">${p ? `You are ${p.qty > 0 ? 'long' : 'short'} ${Math.abs(p.qty)} @ $${F.px(p.avg)} · <span class="${cls((last - p.avg) * p.qty)}">${F.smoney((last - p.avg) * p.qty)}</span>` : 'No position.'} Buying power ${F.money(TM.buyingPower(w, a, t))}${(() => { const r = TM.reserved(w, a, t); return r.orders ? ` <span class="faint">· ${F.money(a.margin ? r.exposure + r.cash : r.cash)} reserved by ${r.orders} queued order${r.orders > 1 ? 's' : ''}</span>` : ''; })()}${(() => { const e2 = TM.orderEffect(a, s.sym, 'sell', 0), e3 = TM.orderEffect(a, s.sym, 'buy', 0); const c = Math.max(e2.closable ? e2.committed : 0, e3.closable ? e3.committed : 0); return c ? ` <span class="faint">· ${c} shares committed to queued orders</span>` : ''; })()}</div>
       <div class="seg big"><button class="${tk.side === 'buy' ? 'on b' : ''}" data-act="side" data-arg="buy">${p && p.qty < 0 ? 'Buy to cover' : 'Buy'}</button><button class="${tk.side === 'sell' ? 'on s' : ''}" data-act="side" data-arg="sell">${sellLabel}</button></div>
       <label class="f"><span>Order type</span><div class="seg" style="display:flex">${[['market', 'Market'], ['limit', 'Limit'], ['stop', 'Stop'], ['stoplimit', 'Stop-limit']].map(([k, l]) => `<button style="flex:1" class="${tk.type === k ? 'on' : ''}" data-act="otype" data-arg="${k}">${l}</button>`).join('')}</div></label>
       <div class="tiny faint" style="margin-top:4px">${typeHelp[tk.type]}</div>

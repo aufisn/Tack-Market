@@ -173,6 +173,10 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Thesis', 'One or two sentences on why this trade and why now. Writing it down is the single best habit for learning from your trades.'],
         ['Buying power', 'How much you can spend on new positions. Cash account: cash minus cash reserved by working buy orders. Margin account: up to 2x your equity minus what you already hold.'],
         ['Queue order', 'Sends the order. It starts working at tomorrow’s open. You can edit or cancel it in the Orders tab until then.']
+        ['Several orders per day', 'You can queue as many orders as you like before pressing <b>Next day</b>, on the same stock or on different ones. They are all worked during the next day in the order the price reaches them.'],
+        ['Reserved by queued orders', 'Queuing an order sets money aside so you cannot spend it twice. On a cash account, each queued buy holds its value plus estimated costs (commission, spread and impact). On a margin account, each queued order that opens or adds to a position holds that much of your 2x buying power, and its estimated costs. The amount is released if you cancel the order or it expires. Your equity does not change: only your buying power does. The ticket shows the total reserved.'],
+        ['Shares committed to queued orders', 'Shares you have already promised to a queued sell (or buy-to-cover) cannot be sold again by another order. On a cash account a second sell of the same shares is refused. On a margin account it is allowed, but the ticket warns you that the extra shares would open a short position (or a long one when covering). Bracket stop-losses and take-profits are protective exits and do not count: they cancel each other and never sell more than you hold.'],
+        ['Why the fill can differ from the reservation', 'Reservations use today\u2019s close (or your limit or stop price) and estimated costs. Market orders fill at tomorrow\u2019s open, so a gap up can make a buy cost more than was reserved. If you then lack the cash or margin, the order is rejected at the open and shown in the day summary and Activity.'],
       ]
     },
     {

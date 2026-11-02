@@ -45,19 +45,40 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   function equityAt(world, acct, d) { return exposures(world, acct, d).equity; }
 
   // Buying power for new opening trades, at last close prices.
-  function buyingPower(world, acct, d) {
-    const ex = exposures(world, acct, d);
-    if (!acct.margin) return Math.max(0, acct.cash - reservedCash(world, acct, d));
-    return Math.max(0, ex.equity / MARGIN.initial - (ex.long + ex.short));
-  }
-  function reservedCash(world, acct, d) {
-    let r = 0;
+  // Queued orders reserve buying power so the same money cannot be committed twice.
+  // Cash account: queued buys hold their value plus estimated costs.
+  // Margin account: queued opening orders (buys and shorts) hold exposure, and their costs hold equity.
+  function reserved(world, acct, d) {
+    const r = { cash: 0, exposure: 0, orders: 0 };
     for (const o of acct.orders) {
-      if (o.status !== 'open' || o.side !== 'buy' || o.reduceOnly) continue;
-      const px = o.type === 'market' ? markPrice(world, o.sym, d) : (o.limit || o.stop);
-      r += o.qty * px;
+      if (o.status !== 'open' || o.reduceOnly) continue;
+      const i = world.bySym[o.sym];
+      const px = o.type === 'market' ? markPrice(world, o.sym, d) : o.type === 'limit' || o.type === 'stoplimit' ? o.limit : o.stop;
+      const notional = o.qty * px;
+      const cost = estimateCosts(world, acct, i, d + 1, o.qty, px, true).total;
+      if (!acct.margin) { if (o.side === 'buy') { r.cash += notional + cost; r.orders++; } }
+      else if (o.opening) { r.exposure += notional; r.cash += cost; r.orders++; }
     }
     return r;
+  }
+  function buyingPower(world, acct, d) {
+    const ex = exposures(world, acct, d), res = reserved(world, acct, d);
+    if (!acct.margin) return Math.max(0, acct.cash - res.cash);
+    return Math.max(0, (ex.equity - res.cash) / MARGIN.initial - (ex.long + ex.short) - res.exposure);
+  }
+  // Shares already promised to other queued (non-protective) orders on the same side.
+  function committedQty(acct, sym, side, excludeId) {
+    let q = 0;
+    for (const o of acct.orders) if (o.status === 'open' && !o.reduceOnly && o.sym === sym && o.side === side && o.id !== excludeId) q += o.qty;
+    return q;
+  }
+  // How an order of qty shares relates to the position: room = shares it can close without reversing.
+  function orderEffect(acct, sym, side, qty) {
+    const held = acct.pos[sym] ? acct.pos[sym].qty : 0;
+    const closable = side === 'sell' ? Math.max(0, held) : Math.max(0, -held);
+    const committed = committedQty(acct, sym, side);
+    const room = Math.max(0, closable - committed);
+    return { held, closable, committed, room, excess: Math.max(0, qty - room), opening: closable === 0 || qty > room };
   }
 
   // ---------- costs ----------
@@ -98,9 +119,10 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     const stop = spec.stop != null && spec.stop !== '' ? Number(spec.stop) : null;
     if ((type === 'limit' || type === 'stoplimit') && !(limit > 0)) errors.push('Enter a limit price.');
     if ((type === 'stop' || type === 'stoplimit') && !(stop > 0)) errors.push('Enter a stop price.');
-    const opening = isOpening(acct, spec.sym, spec.side);
-    const held = acct.pos[spec.sym] ? acct.pos[spec.sym].qty : 0;
-    if (!acct.margin && spec.side === 'sell' && qty > Math.max(0, held)) errors.push(held > 0 ? `You only hold ${held} shares. A cash account cannot go short.` : 'A cash account cannot sell short. Switch to a margin account to short.');
+    const eff = orderEffect(acct, spec.sym, spec.side, qty);
+    const opening = eff.opening, held = eff.held;
+    if (!acct.margin && spec.side === 'sell' && held > 0 && qty > eff.room) errors.push(`Only ${eff.room} of your ${held} shares are free: ${eff.committed} are already committed to queued sell orders.`);
+    else if (!acct.margin && spec.side === 'sell' && qty > Math.max(0, held)) errors.push(held > 0 ? `You only hold ${held} shares. A cash account cannot go short.` : 'A cash account cannot sell short. Switch to a margin account to short.');
     if (opening && acct.lockoutT === t) errors.push('Cool-off: your daily loss limit was hit, so new positions are blocked until tomorrow.');
     if (spec.bracket) {
       const b = spec.bracket;
@@ -467,7 +489,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   }
 
   Object.assign(TM, {
-    COST_MODELS, MARGIN, newAccount, exposures, equityAt, buyingPower, estimateCosts, costParts, commission,
+    COST_MODELS, MARGIN, newAccount, exposures, equityAt, buyingPower, reserved, committedQty, orderEffect, estimateCosts, costParts, commission,
     placeOrder, cancelOrder, modifyOrder, processDay, recordEquity, isOpening, dayPath, evalOrder
   });
 })(TM);
