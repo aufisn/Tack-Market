@@ -106,7 +106,7 @@ tbody tr:hover { background: var(--panel2); }
 
 /* board layout */
 .layout { display: grid; gap: 10px; padding: 10px; grid-template-columns: 280px minmax(0, 1fr) 340px; grid-template-areas: "watch chart ticket" "watch tabs tabs"; align-items: start; }
-.watch { grid-area: watch; position: sticky; top: 62px; max-height: calc(100vh - 72px); display: flex; flex-direction: column; }
+.watch { grid-area: watch; position: sticky; top: calc(var(--tb, 56px) + 8px); max-height: calc(100vh - var(--tb, 56px) - 16px); display: flex; flex-direction: column; }
 .chartcol { grid-area: chart; min-width: 0; }
 .ticket { grid-area: ticket; }
 .tabs { grid-area: tabs; min-width: 0; }
@@ -258,37 +258,48 @@ table.cycle td { border-bottom: 1px solid var(--grid); }
 }
 
 /* ---------- responsive: PC (default), unfolded foldable, folded cover screen ---------- */
-/* Unfolded foldable / tablet (about 600-1099px, near-square): watchlist beside chart + ticket. */
+/* Bottom navigation bar (unfolded foldable, tablet and phone); hidden on PC. */
+.mnav, .show-md, .show-xs { display: none; }
+.mnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 4px; align-items: stretch; background: var(--panel); border-top: 1px solid var(--border); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
+.mnav .nav { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+.mnav .nav i { font-style: normal; font-size: 18px; line-height: 1; }
+.mnav .nav.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 2px 0 var(--accent); }
+.mnav .btn { min-height: 50px; }
+.mnav .btn.primary { flex: 1.4; font-size: 14px; }
+.mnav .btn.five { flex: 0.7; font-size: 13px; }
+
+/* Unfolded foldable / tablet (600-1099px): the watchlist stays as a column on the left; the right side
+   shows one panel at a time (Chart, Trade or Portfolio), switched from the bottom bar. */
 @media (max-width: 1099px) {
-  .layout { grid-template-columns: 230px minmax(0, 1fr); grid-template-areas: "watch chart" "watch ticket" "tabs tabs"; padding: 8px; gap: 8px; }
-  .watch { top: 58px; max-height: calc(100vh - 66px); max-height: calc(100dvh - 66px); }
+  .layout { grid-template-columns: 230px minmax(0, 1fr); grid-template-areas: "watch main"; padding: 8px 8px calc(78px + env(safe-area-inset-bottom)); gap: 8px; }
+  .layout > .pane { display: none; grid-area: main; }
+  .layout > .pane-watch { display: flex; grid-area: watch; top: calc(var(--tb, 56px) + 8px); max-height: calc(100vh - var(--tb, 56px) - 96px); max-height: calc(100dvh - var(--tb, 56px) - 96px); }
+  .layout[data-pane="chart"] > .pane-chart, .layout[data-pane="watch"] > .pane-chart,
+  .layout[data-pane="ticket"] > .pane-ticket, .layout[data-pane="tabs"] > .pane-tabs { display: block; }
+  .mnav { display: flex; }
+  .mnav .nav-market { display: none; }
   .topbar { gap: 4px 14px; }
-  .hide-md { display: none !important; }
+  .topbar .act-btns, .hide-md { display: none !important; }
+  .show-md { display: inline-flex; }
+  .tabbody.scroll { max-height: none; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
 }
-/* Folded cover screen / phone (under 600px): one pane at a time with a bottom navigation bar. */
-.mnav, .show-xs { display: none; }
+/* Folded cover screen / phone (under 600px): one pane at a time, including the market list. */
 @media (max-width: 599px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main"; padding: 6px 6px calc(78px + env(safe-area-inset-bottom)); }
-  .layout > .pane { display: none; grid-area: main; }
+  .layout > .pane-watch { display: none; grid-area: main; position: static; max-height: none; }
   .layout[data-pane="watch"] > .pane-watch { display: flex; }
-  .layout[data-pane="chart"] > .pane-chart, .layout[data-pane="ticket"] > .pane-ticket, .layout[data-pane="tabs"] > .pane-tabs { display: block; }
-  .watch { position: static; max-height: none; }
+  .layout[data-pane="watch"] > .pane-chart { display: none; }
+  .mnav .nav-market { display: flex; }
   .watch-list { overflow: visible; }
   .topbar { padding: 6px 10px; gap: 2px 12px; }
-  .topbar .act-btns, .hide-sm { display: none !important; }
+  .hide-sm { display: none !important; }
   .show-xs { display: inline-flex; }
   .stat b { font-size: 13px; }
-  .mnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; gap: 4px; align-items: stretch; background: var(--panel); border-top: 1px solid var(--border); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
-  .mnav .nav { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
-  .mnav .nav i { font-style: normal; font-size: 18px; line-height: 1; }
-  .mnav .nav.on { color: var(--text); background: var(--panel2); box-shadow: inset 0 2px 0 var(--accent); }
-  .mnav .btn.primary { flex: 1.4; min-height: 50px; font-size: 14px; }
   #priceChart { height: 260px; }
   .profile { grid-template-columns: 1fr 1fr; }
-  .tabbody.scroll { max-height: none; }
   .chart-head .big { font-size: 20px; }
   .banner { margin: 6px 6px 0; }
-  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
   .home { padding: 14px 10px 30px; }
   .hero h1 { font-size: 24px; }
 }
@@ -2201,6 +2212,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
   ];
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const narrow = () => !!(window.matchMedia && matchMedia('(max-width: 599px)').matches);
+  const paned = () => !!(window.matchMedia && matchMedia('(max-width: 1099px)').matches);
   const storageOK = (() => { try { localStorage.setItem(KEY + 'probe', '1'); localStorage.removeItem(KEY + 'probe'); return true; } catch (e) { return false; } })();
 
   function blankTicket() {
@@ -2397,7 +2409,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     if (g.status !== 'active') onSessionEnd();
     saveGame();
     render();
-    if (narrow()) window.scrollTo(0, 0);
+    if (paned()) window.scrollTo(0, 0);
   }
   function setBind(path, el) {
     const [root, key] = path.split('.');
@@ -2436,7 +2448,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     sel(sym) {
       App.ui.sel = sym; App.ui.hover = null;
       const tk = App.ui.ticket; tk.limit = tk.stop = tk.sl = tk.tp = tk.planStop = '';
-      if (narrow() && App.ui.pane !== 'ticket') { App.ui.pane = 'chart'; render(); window.scrollTo(0, 0); return; }
+      if (paned() && App.ui.pane !== 'ticket') { App.ui.pane = 'chart'; render(); window.scrollTo(0, 0); return; }
       render();
     },
     pane(arg) { App.ui.pane = arg; render(); window.scrollTo(0, 0); },
@@ -2524,7 +2536,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       const a2 = atr(i, g.t, 14) * 2, last = W().c[i][g.t];
       App.ui.ticket = Object.assign(blankTicket(), { side: p.qty > 0 ? 'sell' : 'buy', type: 'stop', tif: 'gtc', qty: String(Math.abs(p.qty)), stop: TM.r2(p.qty > 0 ? last - a2 : last + a2).toFixed(2), tag: 'Hedge' });
       toast('Ticket prefilled with a protective GTC stop 2 ATR away. Adjust and queue it.');
-      if (narrow()) App.ui.pane = 'ticket';
+      if (paned()) App.ui.pane = 'ticket';
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -2625,12 +2637,12 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       <div class="brand" data-act="home" title="Home">TACK<small>V3</small></div>
       <div class="stat"><b>${F.date(t)}</b><span>Day ${t - w.start} of ${g.days} · ${active ? 'after the close' : 'session ended'}</span></div>
       <div class="stat hide-md hide-sm"><b>${esc(TM.sessionLabel(g))}</b><span>${g.margin ? 'margin' : 'cash'} account${g.hidden ? ' · market type hidden' : ''}</span></div>
-      <div class="stat hide-sm"><b>${w.tmx[t].toFixed(1)} <span class="${cls(tmxCh)}">${F.spct(tmxCh, 2)}</span></b><span>TMX index</span></div>
+      <div class="stat hide-md"><b>${w.tmx[t].toFixed(1)} <span class="${cls(tmxCh)}">${F.spct(tmxCh, 2)}</span></b><span>TMX index</span></div>
       <div class="spacer"></div>
       <div class="stat"><b>${F.money(eq)}</b><span>Equity</span></div>
       <div class="stat"><b class="${cls(eq - prev)}">${F.smoney(eq - prev)}</b><span>Day P&amp;L</span></div>
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
-      <div class="stat hide-sm"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
+      <div class="stat hide-md"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
       <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
       ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
@@ -2687,7 +2699,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       <span class="nm">${esc(r.s.name)}</span>
       <span class="ch ${cls(r.ch)}">${sort === 'volume' ? (r.vr).toFixed(1) + 'x vol' : sort === 'upside' ? F.spct(r.up, 0) + ' tgt' : F.spct(r.ch, 2)}</span>
     </div>`).join('');
-    return `<div class="watch-head"><div class="row"><span class="label grow">Market · 40 stocks + index fund ${q('watchlist', 'market list')}</span>
+    return `<div class="watch-head"><div class="row"><span class="label grow" title="40 stocks plus the TMXI index fund">Market ${q('watchlist', 'market list')}</span>
       <select data-bind="ui.sort" data-rerender="1" style="width:auto;padding:2px 4px;font-size:12px" aria-label="Sort">
         ${[['sector', 'Sector'], ['change', 'Day change'], ['volume', 'Volume vs avg'], ['upside', 'Analyst upside'], ['name', 'Ticker']].map(([k, v]) => `<option value="${k}" ${sort === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       <div class="filters">${['All'].concat(w.secNames).map((s) => `<button class="${App.ui.sector === s ? 'on' : ''}" data-act="sector" data-arg="${s}">${s === 'All' ? 'All' : `<span class="dot" style="background:${SEC_COLOR[s]};width:6px;height:6px"></span> ${s}`}</button>`).join('')}</div></div>
@@ -2717,7 +2729,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     return `<div class="panel">
       <div class="chart-head"><span class="dot" style="background:${SEC_COLOR[s.sector]}"></span><h2 class="mono">${s.sym}</h2><span class="muted">${esc(s.name)}</span>
         <span class="big">${F.px(last)}</span><span class="mono ${cls(ch1)}">${F.smoney(last - w.c[i][t - 1], 2)} (${F.spct(ch1, 2)})</span>
-        <button class="btn sm primary show-xs" style="margin-left:auto" data-act="pane" data-arg="ticket">Trade ${s.sym}</button></div>
+        <button class="btn sm primary show-md" style="margin-left:auto" data-act="pane" data-arg="ticket">Trade ${s.sym}</button></div>
       <div class="chart-tools"><span class="small faint grow">${esc(s.blurb)}</span>
         <div class="seg">${[[63, '3M'], [126, '6M'], [250, '1Y']].map(([n, l]) => `<button class="${App.ui.range === n ? 'on' : ''}" data-act="range" data-arg="${n}">${l}</button>`).join('')}</div>
         ${q('chart', 'reading the chart')}<div class="seg"><button class="${App.ui.sma20 ? 'on' : ''}" data-act="toggle" data-arg="sma20">SMA20</button><button class="${App.ui.sma50 ? 'on' : ''}" data-act="toggle" data-arg="sma50">SMA50</button><button class="${App.ui.showVol ? 'on' : ''}" data-act="toggle" data-arg="showVol">Vol</button></div></div>
@@ -2960,8 +2972,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       <section class="chartcol pane pane-chart">${viewChart()}</section>
       <aside class="ticket panel pane pane-ticket">${viewTicket()}</aside>
       <section class="tabs panel pane pane-tabs">${viewTabs()}</section></div>
-      <nav class="mnav" aria-label="Sections">${nav.map(([k, ic, l]) => `<button class="nav ${pane === k ? 'on' : ''}" data-act="pane" data-arg="${k}" aria-current="${pane === k}"><i aria-hidden="true">${ic}</i>${l}</button>`).join('')}
-      ${active ? '<button class="btn primary" data-act="next">Next day ▸</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
+      <nav class="mnav" aria-label="Sections">${nav.map(([k, ic, l]) => `<button class="nav nav-${k === 'watch' ? 'market' : k} ${pane === k || (k === 'chart' && pane === 'watch' && !narrow()) ? 'on' : ''}" data-act="pane" data-arg="${k}" aria-current="${pane === k}"><i aria-hidden="true">${ic}</i>${l}</button>`).join('')}
+      ${active ? '<button class="btn five" data-act="next5" title="Advance five days">+5</button><button class="btn primary" data-act="next">Next day ▸</button>' : '<button class="btn primary" data-act="resume">Debrief</button>'}</nav>`;
   }
 
   // ---------- views: end / debrief ----------
