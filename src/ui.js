@@ -327,8 +327,8 @@
       if (pc.blocking) { toast(pc.items.find((x) => x.lvl === 'block').text); return; }
       const spec = {
         sym: App.ui.sel, side: tk.side, qty: pc.qty, type: tk.type, limit: tk.limit, stop: tk.stop, tif: tk.tif,
-        bracket: tk.bracket && (tk.sl || tk.tp) ? { stop: tk.sl || null, target: tk.tp || null } : null,
-        plannedStop: tk.bracket ? null : tk.planStop || null, tag: tk.tag, note: tk.note, flags: pc.flags
+        bracket: pc.opening && tk.bracket && (tk.sl || tk.tp) ? { stop: tk.sl || null, target: tk.tp || null } : null,
+        plannedStop: !pc.opening || tk.bracket ? null : tk.planStop || null, tag: tk.tag, note: tk.note, flags: pc.flags
       };
       const res = TM.placeOrder(w, g.player, spec, g.t);
       if (!res.ok) { toast(res.errors[0]); return; }
@@ -575,6 +575,8 @@
     const active = g.status === 'active';
     const typeHelp = { market: 'Fills at the next open, plus spread and impact. Overnight gaps can move it far from today’s close.', limit: 'Buy at or below / sell at or above your price. You may not get filled.', stop: 'Becomes a market order once price trades through the stop. Gaps can fill you well past it.', stoplimit: 'Triggers at the stop, then only fills at your limit or better. In a gap it may not fill at all.' };
     const sellLabel = a.margin ? (p && p.qty > 0 ? 'Sell' : 'Sell short') : 'Sell';
+    const closing = TM.orderEffect(a, s.sym, tk.side, 0).closable > 0;
+    const stopSide = tk.side === 'buy' ? 'below' : 'above', targetSide = tk.side === 'buy' ? 'above' : 'below';
     return `<div class="pad"><div class="row"><span class="label grow">Order ticket ${q('ticket', 'order ticket')}</span><span class="mono small">${s.sym} $${F.px(last)}</span></div>
       <div class="small muted" style="margin:6px 0 8px">${p ? `You are ${p.qty > 0 ? 'long' : 'short'} ${Math.abs(p.qty)} @ $${F.px(p.avg)} · <span class="${cls((last - p.avg) * p.qty)}">${F.smoney((last - p.avg) * p.qty)}</span>` : 'No position.'} Buying power ${F.money(TM.buyingPower(w, a, t))}${(() => { const r = TM.reserved(w, a, t); return r.orders ? ` <span class="faint">· ${F.money(a.margin ? r.exposure + r.cash : r.cash)} reserved by ${r.orders} queued order${r.orders > 1 ? 's' : ''}</span>` : ''; })()}${(() => { const e2 = TM.orderEffect(a, s.sym, 'sell', 0), e3 = TM.orderEffect(a, s.sym, 'buy', 0); const c = Math.max(e2.closable ? e2.committed : 0, e3.closable ? e3.committed : 0); return c ? ` <span class="faint">· ${c} shares committed to queued orders</span>` : ''; })()}</div>
       <div class="seg big"><button class="${tk.side === 'buy' ? 'on b' : ''}" data-act="side" data-arg="buy">${p && p.qty < 0 ? 'Buy to cover' : 'Buy'}</button><button class="${tk.side === 'sell' ? 'on s' : ''}" data-act="side" data-arg="sell">${sellLabel}</button></div>
@@ -587,11 +589,13 @@
         ${tk.type === 'market' ? '<div></div>' : ''}
       </div>
       <div class="row" style="margin-top:8px"><span class="small muted grow">Time in force</span><div class="seg"><button class="${tk.tif === 'day' ? 'on' : ''}" data-act="tif" data-arg="day">Day</button><button class="${tk.tif === 'gtc' ? 'on' : ''}" data-act="tif" data-arg="gtc">GTC (60d)</button></div></div>
+      ${closing ? `<div class="ticket-note">You are ${p.qty > 0 ? 'long' : 'short'} ${Math.abs(p.qty)} ${s.sym}, so this <b>${tk.side === 'sell' ? 'Sell' : 'Buy to cover'}</b> order closes or reduces that position. A bracket and planned stop only apply to <b>new</b> positions. To protect the position instead, choose a <b>Stop</b> order here, or use <b>Stop</b> on the Positions tab.</div>` : `
+      ${tk.side === 'sell' && a.margin ? '<div class="ticket-note">Short trade: you profit if the price <b>falls</b>, so the stop-loss goes <b>above</b> your entry and the take-profit <b>below</b> it.</div>' : ''}
       <label class="check"><input type="checkbox" ${tk.bracket ? 'checked' : ''} data-bind="ticket.bracket" data-rerender="1"> Attach bracket: stop-loss + take-profit (one cancels the other)</label>
-      ${tk.bracket ? `<div class="split"><label class="f"><span>Stop-loss <button class="btn link tiny" data-act="suggestStop">2 ATR</button></span><input type="number" step="0.01" value="${esc(tk.sl)}" data-bind="ticket.sl" data-live="1"></label>
-        <label class="f"><span>Take-profit <button class="btn link tiny" data-act="suggestTarget">2R</button></span><input type="number" step="0.01" value="${esc(tk.tp)}" data-bind="ticket.tp" data-live="1"></label></div>`
-        : `<label class="f"><span>Planned stop: where are you wrong? <button class="btn link tiny" data-act="suggestStop">2 ATR</button></span><input type="number" step="0.01" value="${esc(tk.planStop)}" placeholder="not set" data-bind="ticket.planStop" data-live="1"></label>`}
-      <div class="row" style="margin-top:8px"><span class="small muted">Risk</span><input type="number" step="0.25" min="0.05" value="${esc(tk.riskPct)}" data-bind="ticket.riskPct" style="width:70px"><span class="small muted grow">% of equity</span><button class="btn sm" data-act="sizeIt">Size from stop</button></div>
+      ${tk.bracket ? `<div class="split"><label class="f"><span>Stop-loss <span class="faint">(${stopSide} entry)</span> <button class="btn link tiny" data-act="suggestStop">2 ATR</button></span><input type="number" step="0.01" value="${esc(tk.sl)}" data-bind="ticket.sl" data-live="1"></label>
+        <label class="f"><span>Take-profit <span class="faint">(${targetSide} entry)</span> <button class="btn link tiny" data-act="suggestTarget">2R</button></span><input type="number" step="0.01" value="${esc(tk.tp)}" data-bind="ticket.tp" data-live="1"></label></div>`
+        : `<label class="f"><span>Planned stop: where are you wrong? <span class="faint">(${stopSide} entry)</span> <button class="btn link tiny" data-act="suggestStop">2 ATR</button></span><input type="number" step="0.01" value="${esc(tk.planStop)}" placeholder="not set" data-bind="ticket.planStop" data-live="1"></label>`}
+      <div class="row" style="margin-top:8px"><span class="small muted">Risk</span><input type="number" step="0.25" min="0.05" value="${esc(tk.riskPct)}" data-bind="ticket.riskPct" style="width:70px"><span class="small muted grow">% of equity</span><button class="btn sm" data-act="sizeIt">Size from stop</button></div>`}
       <div class="split"><label class="f"><span>Setup</span><select data-bind="ticket.tag" data-live="1"><option value="">–</option>${SETUPS.map((x) => `<option ${tk.tag === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label class="f"><span>ATR (14d)</span><input type="text" value="${F.px(atr(i, t, 14))}" disabled></label></div>
       <label class="f"><span>Thesis: why this trade, why now?</span><textarea data-bind="ticket.note" maxlength="400" placeholder="e.g. Pullback to 50-day average in an uptrend, earnings 3 weeks away">${esc(tk.note)}</textarea></label>
@@ -848,19 +852,20 @@
   // ---------- views: help guide ----------
   // One section at a time (with a sticky contents list) so nothing is ever a long scroll away.
   // Search looks across every section; printing renders the whole guide.
+  const validItems = (sec) => sec.items.filter((it) => Array.isArray(it) && typeof it[0] === 'string' && typeof it[1] === 'string');
   function helpMatches() {
     const qv = App.ui.helpQ.trim().toLowerCase();
     const strip = (x) => x.replace(/<[^>]+>/g, '');
     return TM.HELP.map((sec) => {
       const inTitle = sec.title.toLowerCase().includes(qv);
-      const items = sec.items.filter(([k, v]) => inTitle || k.toLowerCase().includes(qv) || strip(v).toLowerCase().includes(qv));
+      const items = validItems(sec).filter(([k, v]) => inTitle || k.toLowerCase().includes(qv) || strip(v).toLowerCase().includes(qv));
       return Object.assign({}, sec, { items });
     }).filter((sec) => sec.items.length);
   }
   const helpSection = (sec, opts) => `<section class="panel pad help-sec" id="h-${sec.id}">
     <div class="row"><h2 class="grow">${esc(sec.title)}</h2>${opts && opts.open ? `<button class="btn sm noprint" data-act="helpGo" data-arg="${sec.id}">Open section</button>` : ''}</div>
     ${sec.intro && !(opts && opts.open) ? `<div class="muted help-intro">${sec.intro}</div>` : ''}
-    <dl class="glossary">${sec.items.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl></section>`;
+    <dl class="glossary">${validItems(sec).map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('')}</dl></section>`;
   function viewHelpBody() {
     if (App.ui.helpPrintAll) return TM.HELP.map((sec) => helpSection(sec)).join('');
     if (App.ui.helpQ.trim()) {
