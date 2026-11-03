@@ -56,6 +56,7 @@
     ui: {
       sel: 'TMXI', tab: 'positions', pane: 'chart', helpQ: '', helpFrom: 'home', helpSec: null, range: 126, sma20: true, sma50: true, showVol: true, sector: 'All', sort: 'sector', hover: null,
       perf: { you: true, index: true, equal: false, momentum: false, value: false, rules: false },
+      endPerf: { you: true, index: true, equal: true, momentum: true, value: true, rules: true },
       newsMine: false, editOrder: null, edit: {}, ticket: blankTicket(), banner: null,
       practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '' }
     }
@@ -289,6 +290,7 @@
     otype(arg) { App.ui.ticket.type = arg; render(); },
     tif(arg) { App.ui.ticket.tif = arg; render(); },
     perf(arg) { App.ui.perf[arg] = !App.ui.perf[arg]; render(); },
+    endPerf(arg) { App.ui.endPerf[arg] = !App.ui.endPerf[arg]; drawLines('endChart', App.ui.endPerf); document.querySelectorAll('[data-act="endPerf"]').forEach((b) => b.classList.toggle('on', !!App.ui.endPerf[b.dataset.arg])); },
     newsMine() { App.ui.newsMine = !App.ui.newsMine; render(); },
     maxQty() {
       const w = W(), g = G(), i = idx(App.ui.sel), tk = App.ui.ticket, t = g.t;
@@ -715,8 +717,8 @@
     ];
     return `<div class="metrics">${cards.map(([k, v, c]) => `<div class="metric"><b class="${c}">${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
-  function legend(sel) {
-    return `<div class="legend">${SERIES.map((s) => `<button class="${sel[s.id] ? 'on' : ''}" data-act="perf" data-arg="${s.id}"><i style="background:var(${s.v})"></i>${s.label}</button>`).join('')}</div>`;
+  function legend(sel, act) {
+    return `<div class="legend">${SERIES.map((s) => `<button class="${sel[s.id] ? 'on' : ''}" data-act="${act || 'perf'}" data-arg="${s.id}" aria-pressed="${!!sel[s.id]}" title="Show or hide ${s.label}"><i style="background:var(${s.v})"></i>${s.label}</button>`).join('')}</div>`;
   }
   function tabPerformance() {
     const w = W(), g = G(), m = TM.metrics(w, g.player), c = g.player.costs;
@@ -827,7 +829,6 @@
     const trades = a.trades.slice().sort((x, y) => y.net - x.net);
     const tline = (t) => `<div class="news-item"><span class="when">${F.sdate(t.openDay)}</span><span><b class="mono">${t.sym}</b> ${t.dir > 0 ? 'long' : 'short'} · <span class="${cls(t.net)}">${F.smoney(t.net)}</span>${t.r != null ? ` · ${t.r.toFixed(2)}R` : ''} · ${t.closeDay - t.openDay}d · ${esc(t.exitReason)}${t.note ? ` · <i class="faint">${esc(t.note)}</i>` : ''}</span></div>`;
     const accts = [a].concat(TM.BOT_DEFS.map((b) => g.bots[b.id])).map((x) => ({ x, m: TM.metrics(w, x) })).sort((p, q) => q.m.total - p.m.total);
-    const all = {}; SERIES.forEach((s) => { all[s.id] = true; });
     return `<header class="topbar"><div class="brand" data-act="home">TACK<small>V3</small></div><div class="stat"><b>${esc(TM.sessionLabel(g))}</b><span>${F.date(w.start)} → ${F.date(g.t)}</span></div><div class="spacer"></div>
       <button class="btn" data-act="viewBoard">Review board</button><button class="btn" data-act="exportCsv">Trades CSV</button><button class="btn primary" data-act="home">New session</button><button class="btn ghost sm qbtn" data-act="help" data-arg="debrief" aria-label="Help guide">?</button><button class="btn ghost sm" data-act="theme">◐</button></header>
       <div class="home">
@@ -835,7 +836,7 @@
         <div class="muted">${res.reason ? esc(res.reason) + ' ' : ''}Index fund: ${F.spct(m.benchTotal)} · Excess: <span class="${cls(m.excess)}">${F.spct(m.excess)}</span> · Sharpe ${F.num(m.sharpe)} vs ${F.num(bm.sharpe)} · Max DD ${F.pct(m.maxDD)} vs ${F.pct(bm.maxDD)}</div>
         ${res.checks.length ? `<ul class="checks" style="max-width:560px;margin:12px auto 6px;text-align:left">${res.checks.map((c) => `<li><span>${c.ok ? '<span class="up">✓</span>' : '<span class="down">✕</span>'} ${esc(c.label)} <span class="faint tiny">(${esc(c.need)})</span></span><b class="mono">${esc(c.value)}</b></li>`).join('')}</ul>` : ''}
         ${g.unranked ? '<div class="tiny faint">Unranked session.</div>' : ''}</div>
-      <div class="section panel pad"><h3>Equity: you vs every strategy on the same market</h3>${legend(all).replace(/data-act="perf"/g, 'data-act="noop"')}<canvas id="endChart" role="img" aria-label="Equity curves"></canvas>
+      <div class="section panel pad"><h3>Equity: you vs every strategy on the same market</h3>${legend(App.ui.endPerf, 'endPerf')}<div class="tiny faint" style="margin:-2px 0 6px">Tap a name to show or hide its line.</div><canvas id="endChart" role="img" aria-label="Equity curves"></canvas>
         <div class="label" style="margin:10px 0 4px">What the market was really doing · ${esc(TM.SCENARIOS[g.scenario].label)}${g.hidden ? ' (it was hidden from you)' : ''}</div><canvas id="regimeChart" role="img" aria-label="Market regimes"></canvas>
         <div class="regimes">${segs.map((s) => `<span class="chip"><span class="dot" style="background:var(--reg-${s.r})"></span>${TM.REGIMES[s.r].label} · ${s.to - s.from + 1}d · <span class="${cls(s.ret)}">${F.spct(s.ret)}</span></span>`).join('')}</div>
         <div class="tiny faint" style="margin-top:6px">Market seed ${g.seed}. Enter it in Practice with the same scenario and length to replay this exact market.</div></div>
@@ -1095,8 +1096,7 @@
       drawPrice();
       if (App.ui.tab === 'performance') { drawLines('perfChart', App.ui.perf); drawLines('ddChart', { you: true, index: true }, { dd: true }); }
     } else if (App.screen === 'end') {
-      const all = {}; SERIES.forEach((s) => { all[s.id] = true; });
-      drawLines('endChart', all); drawRegime('regimeChart');
+      drawLines('endChart', App.ui.endPerf); drawRegime('regimeChart');
     }
   }
 
