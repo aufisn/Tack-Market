@@ -69,5 +69,32 @@ for (const k in by) {
 console.log(`all       ${(m(rows, 't') * 100).toFixed(1).padStart(6)}% ${(m(rows, 'i') * 100).toFixed(1).padStart(6)}% ${(m(rows, 'ddT') * 100).toFixed(1).padStart(8)}% ${(m(rows, 'ddI') * 100).toFixed(1).padStart(7)}%`);
 console.log('actions per 42 sessions:', JSON.stringify(actions));
 console.log('stock entries', entries, '| log entries per session: avg', TM.mean(logSizes).toFixed(0), 'max', Math.max(...logSizes));
+// 3. styles: each one applies exactly its freedoms
+for (const style of ['conservative', 'balanced', 'aggressive']) {
+  let maxR = 0, maxP = 0, earningsBuys = 0, coolOffs = 0;
+  let marginOk = true;
+  for (let g = 0; g < 6; g++) {
+    const { game, world } = TM.createGame({ mode: 'practice', seed: 5100 + g, scenario: ['random', 'gfc', 'bull'][g % 3], days: 120, margin: false, traderStyle: style });
+    const a = game.bots.trader;
+    if (a.margin !== (style !== 'conservative')) marginOk = false;
+    while (game.status === 'active') TM.advanceDay(world, game);
+    ok(game.traderLog[0] && game.traderLog[0].action === 'STYLE', style + ': style recorded as the first log entry');
+    for (const e of game.traderLog) {
+      if (e.action === 'BUY' || e.action === 'SHORT') {
+        maxR = Math.max(maxR, e.riskPct); maxP = Math.max(maxP, e.posPct);
+        const i = world.bySym[e.sym], ne = TM.nextEarnings(world, i, e.t);
+        if (ne != null && ne - e.t <= 3) earningsBuys++;
+      }
+      if (e.action === 'RULES' && e.title === 'Risk rules applied') coolOffs++;
+    }
+  }
+  ok(marginOk, style + ': account type follows the style (player had a cash account)');
+  const riskCap = style === 'aggressive' ? 0.02 : 0.01, posCap = style === 'conservative' ? 0.15 : 0.25;
+  ok(maxR <= riskCap + 1e-9, `${style}: risk per trade within ${riskCap * 100}% (max ${(maxR * 100).toFixed(2)}%)`);
+  ok(maxP <= posCap + 1e-9, `${style}: positions within ${posCap * 100}% (max ${(maxP * 100).toFixed(1)}%)`);
+  if (style !== 'aggressive') ok(earningsBuys === 0, `${style}: never buys within 3 days of earnings (${earningsBuys})`);
+  if (style === 'aggressive') ok(coolOffs === 0, 'aggressive: loss rules never applied');
+  console.log(`style ${style.padEnd(12)} max risk ${(maxR * 100).toFixed(2)}%  max position ${(maxP * 100).toFixed(1)}%  buys before earnings ${earningsBuys}  rule activations ${coolOffs}`);
+}
 console.log(fails ? `\n${fails} FAILED` : '\nall trader checks passed');
 process.exitCode = fails ? 1 : 0;

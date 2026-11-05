@@ -61,7 +61,7 @@
       endPerf: { you: true, index: true, equal: true, momentum: true, value: true, rules: true, trader: true },
       trFilter: 'all',
       newsMine: false, editOrder: null, edit: {}, ticket: blankTicket(), banner: null,
-      practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '' }
+      practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '', traderStyle: 'conservative' }
     }
   };
   TM.App = App;
@@ -274,7 +274,7 @@
     },
     theme() { const cur = App.progress.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); App.progress.theme = cur === 'dark' ? 'light' : 'dark'; saveProgress(); applyTheme(); render(); },
     resume() { if (App.game) { App.screen = App.game.status === 'active' ? 'game' : 'end'; render(); } },
-    practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed }); },
+    practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed, traderStyle: p.traderStyle }); },
     level(arg) { startGame({ mode: 'level', level: Number(arg) }); },
     daily() { startGame({ mode: 'daily' }); },
     next() { nextDays(1); },
@@ -448,6 +448,8 @@
           <label class="f"><span>Starting capital</span><select data-bind="practice.capital">${[10000, 100000, 1000000].map((d) => `<option value="${d}" ${Number(p.capital) === d ? 'selected' : ''}>${F.money(d)}</option>`).join('')}</select></label></div>
           <div class="split"><label class="f"><span>Account</span><select data-bind="practice.margin"><option value="false" ${String(p.margin) === 'false' ? 'selected' : ''}>Cash (no shorting)</option><option value="true" ${String(p.margin) === 'true' ? 'selected' : ''}>Margin (2x, shorting)</option></select></label>
           <label class="f"><span>Trading costs</span><select data-bind="practice.costModel">${Object.entries(TM.COST_MODELS).map(([k, v]) => `<option value="${k}" ${p.costModel === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label></div>
+          <label class="f"><span>Market Trader style ${q('trader', 'Market Trader styles')}</span><select data-bind="practice.traderStyle" data-rerender="1">${Object.entries(TM.TRADER_STYLES).map(([k, v]) => `<option value="${k}" ${p.traderStyle === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
+          <div class="tiny faint" style="margin-top:4px">${esc(TM.TRADER_STYLES[p.traderStyle || 'conservative'].summary)}</div>
           <label class="f"><span>Seed (optional: replay an exact market)</span><input type="text" inputmode="numeric" placeholder="random" value="${esc(p.seed)}" data-bind="practice.seed"></label>
           <button class="btn primary" style="width:100%;margin-top:12px" data-act="practice">Start practice</button>
         </section>
@@ -1001,7 +1003,8 @@
         ${e.during ? '' : `<div class="tiny faint">Decided after the close on ${F.date(e.t)}; orders execute from the next open.</div>`}</div></details>`;
     };
     return `<div class="section panel pad" id="trader-log"><div class="row"><h3 class="grow">Market Trader: what a professional did with the same data</h3>${'<button class="qbtn" data-act="help" data-arg="trader" aria-label="Help: Market Trader">?</button>'}</div>
-      <p class="small muted">Same market, same information, same ${a.margin ? 'margin' : 'cash'} account, same costs and your risk rules. It never saw the future: each decision below uses only what was visible at that evening's close, exactly as you saw it.</p>
+      ${(() => { const ts = TM.traderStyleOf(g); return `<div class="ticket-note" style="margin:4px 0 8px"><b>Style: ${esc(ts.label)}.</b> ${esc(ts.summary)}${g.mode === 'practice' ? ' To compare styles, start a new Practice session with the same scenario, length and seed ' + g.seed + ', and pick another style.' : ''}</div>`; })()}
+      <p class="small muted">Same market, same information and same costs as you${TM.traderStyleOf(g).margin ? '' : `, the same ${a.margin ? 'margin' : 'cash'} account and your risk rules`}. It never saw the future: each decision below uses only what was visible at that evening's close, exactly as you saw it.</p>
       <div class="tablewrap"><table><thead><tr><th></th><th class="num">You</th><th class="num">Market Trader</th><th class="num">Index fund</th></tr></thead><tbody>
         ${row('Return', (m) => `<span class="${cls(m.total)}">${F.spct(m.total)}</span>`)}${row('Sharpe ratio', (m) => F.num(m.sharpe))}${row('Max drawdown', (m) => `<span class="down">${F.pct(m.maxDD)}</span>`)}
         ${row('Closed trades', (m) => String(m.trades))}${row('Win rate', (m) => F.pct(m.winRate, 0))}${row('Average R', (m) => F.num(m.avgR))}${row('Avg exposure', (m) => F.pct(m.gross, 0))}${row('Trading costs', (m) => F.money(m.frictions))}

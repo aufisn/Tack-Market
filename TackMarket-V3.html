@@ -1663,6 +1663,17 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     'Risk-off': { gross: 0.35, maxPos: 5, entries: 1, note: 'the market is in a downtrend or unusually volatile, so capital is protected first' }
   };
 
+  // Styles: which exemptions from the player's rules the trader is given (measured in testing).
+  const STYLES = {
+    conservative: { label: 'Conservative', margin: null, posCap: 15, riskPct: null, lossRules: true, earningsOk: false,
+      summary: 'Plays by exactly your rules: your account type, your risk per trade, your loss limits, and positions capped at 15% (or your own limit if lower).' },
+    balanced: { label: 'Balanced', margin: true, posCap: 25, riskPct: null, lossRules: true, earningsOk: false,
+      summary: 'Two freedoms: a margin account (so it can hedge and short) and positions of up to 25% in its best ideas. Your risk per trade and loss limits still apply.' },
+    aggressive: { label: 'Aggressive', margin: true, posCap: 25, riskPct: 2, lossRules: false, earningsOk: true,
+      summary: 'Every freedom: margin account, positions up to 25%, 2% risk per trade, no daily-loss or drawdown limits, and it may buy just before earnings.' }
+  };
+  const styleOf = (game) => STYLES[game.traderStyle] || STYLES.conservative;
+
   const pct = (x, dp) => (x >= 0 ? '+' : '') + (x * 100).toFixed(dp == null ? 1 : dp) + '%';
   const pp = (x, dp) => (x * 100).toFixed(dp == null ? 1 : dp) + '%';
   const usd = (x) => '$' + x.toFixed(2);
@@ -1817,20 +1828,28 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     const ex = TM.exposures(w, a, t);
 
     // risk rules from the player's own settings
-    const riskPct = Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2) / 100;
-    const maxPosPct = Math.min(rules.maxPosPct || 25, 15) / 100;
+    const style = styleOf(game);
+    if (!st.styleLogged) {
+      st.styleLogged = true;
+      add({ kind: 'view', action: 'STYLE', title: `Trading style: ${style.label}`, why: [style.summary,
+        style.margin ? 'It uses a margin account even if yours is a cash account.' : `It uses the same ${a.margin ? 'margin' : 'cash'} account type as you.`],
+        data: [['Account', a.margin ? 'Margin' : 'Cash'], ['Risk per trade', style.riskPct ? `${style.riskPct}% (exempt from your rule)` : `${Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2)}% (your rule)`],
+          ['Position cap', style.margin ? `${style.posCap}% (exempt from your rule)` : `${Math.min(rules.maxPosPct || 25, style.posCap)}%`], ['Loss limits', style.lossRules ? 'yours apply' : 'none'], ['Buying before earnings', style.earningsOk ? 'allowed' : 'avoided']] });
+    }
+    const riskPct = (style.riskPct || Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2)) / 100;
+    const maxPosPct = (style.margin ? style.posCap : Math.min(rules.maxPosPct || 25, style.posCap)) / 100;
     const dayRet = E.length > 1 ? eq / E[E.length - 2].eq - 1 : 0;
     const ddNow = eq / a.peak - 1;
     let riskScale = 1, blockNew = false;
     const ruleNotes = [];
-    if (rules.dailyLossPct && dayRet <= -rules.dailyLossPct / 100) {
+    if (style.lossRules && rules.dailyLossPct && dayRet <= -rules.dailyLossPct / 100) {
       blockNew = true;
       ruleNotes.push(`Lost ${pct(dayRet)} today, beyond the ${rules.dailyLossPct}% daily loss limit: no new positions tomorrow (cool-off).`);
     }
-    if (rules.maxDDPct && ddNow <= -rules.maxDDPct / 100) {
+    if (style.lossRules && rules.maxDDPct && ddNow <= -rules.maxDDPct / 100) {
       blockNew = true;
       ruleNotes.push(`Drawdown ${pct(ddNow)} breaches the ${rules.maxDDPct}% limit: no new risk until the account recovers.`);
-    } else if (rules.maxDDPct && ddNow <= -rules.maxDDPct * 0.6 / 100) {
+    } else if (style.lossRules && rules.maxDDPct && ddNow <= -rules.maxDDPct * 0.6 / 100) {
       riskScale = 0.5;
       ruleNotes.push(`Drawdown ${pct(ddNow)} is past 60% of the ${rules.maxDDPct}% limit: risk per trade halved.`);
     }
@@ -1997,7 +2016,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       if (x.score < minScore) break;
       if (a.pos[x.sym] || working(x.sym).length) continue;
       const fail = x.px < x.s50 || x.slope <= 0 ? 'the score is high but the price is not in an uptrend (below or flattening 50-day average), and buying against the trend is avoided'
-        : x.daysToE <= 3 ? `earnings are due in ${x.daysToE} trading days; entering just before a ±${pp(x.implied)} event turns a planned trade into a coin toss`
+        : x.daysToE <= 3 && !style.earningsOk ? `earnings are due in ${x.daysToE} trading days; entering just before a ±${pp(x.implied)} event turns a planned trade into a coin toss`
           : x.r5 > 0.08 ? `it is up ${pct(x.r5)} in five days; the bot waits for a pullback rather than chase`
             : (sectorVal[x.sector] || 0) / eq > SECTOR_CAP - 0.05 ? `${x.sector} already takes ${pp((sectorVal[x.sector] || 0) / eq, 0)} of equity (cap ${pp(SECTOR_CAP, 0)})`
               : x.news.some((n) => n.tone < 0) ? 'there was negative company news in the last three days' : null;
@@ -2078,7 +2097,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     }
   }
 
-  Object.assign(TM, { marketTrader, traderReadMarket: readMarket, traderScore: scoreStocks });
+  Object.assign(TM, { marketTrader, traderReadMarket: readMarket, traderScore: scoreStocks, TRADER_STYLES: STYLES, traderStyleOf: styleOf });
 })(TM);
 
 /* Tack Market V3 · game layer
@@ -2137,13 +2156,19 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     const world = TM.generateWorld({ seed, scenario, sessionDays: days });
     const player = TM.newAccount('you', cfg.name || 'You', capital, { margin, costModel, track: true, rules });
     const bots = {};
-    for (const b of TM.BOT_DEFS) bots[b.id] = TM.newAccount(b.id, b.label, capital, { margin: b.id === 'trader' ? margin : false, costModel, rules: b.id === 'trader' ? rules : null });
+    // Market Trader's style is chosen in Practice; graded modes always use Conservative (your exact rules).
+    const traderStyle = !lv && !daily && TM.TRADER_STYLES[cfg.traderStyle] ? cfg.traderStyle : 'conservative';
+    const ts = TM.TRADER_STYLES[traderStyle];
+    for (const b of TM.BOT_DEFS) {
+      const isT = b.id === 'trader';
+      bots[b.id] = TM.newAccount(b.id, isT ? `${b.label} (${ts.label})` : b.label, capital, { margin: isT ? (ts.margin == null ? margin : ts.margin) : false, costModel, rules: isT ? rules : null });
+    }
     const game = {
       v: 3, seed, scenario, hidden: pick === 'hidden', mode: lv ? 'level' : daily ? 'daily' : 'practice',
       level: lv ? lv.id : null, daily, days, capital, margin, costModel, t: world.start,
       player, bots, botCfg: Object.assign({}, TM.DEFAULT_RULES_BOT),
       status: 'active', result: null, unranked: !!cfg.unranked, created: Date.now(), ddWarned: false,
-      traderLog: [], traderState: null
+      traderLog: [], traderState: null, traderStyle
     };
     TM.recordEquity(world, player, world.start);
     for (const id in bots) TM.recordEquity(world, bots[id], world.start);
@@ -2280,6 +2305,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Trading costs: Zero-commission app', 'No commission, but the effective spread is 1.6x wider, because such apps are paid by routing your orders to market makers (payment for order flow). Often cheaper for small trades, more expensive for large or frequent ones.'],
         ['Trading costs: Frictionless (unrealistic)', 'No costs at all. Not realistic. Use it only to measure how much costs hurt you: play the same seed with and without costs and compare.'],
         ['Seed', 'A number that fixes the entire market: every price, headline and date. Leave it blank for a new random market. Enter a seed (shown in the debrief and the Account tab) to replay exactly the same market and try a different approach.'],
+        ['Market Trader style', 'Chooses which freedoms (exemptions from your rules) Market Trader gets in this Practice session: <b>Conservative</b>, <b>Balanced</b> or <b>Aggressive</b>. See <b>Market Trader styles</b> in the Market Trader section. Career levels and the Daily challenge always use Conservative.'],
         ['Your name', 'Shown on the leaderboard as your account name. Stored only in this browser.']
       ]
     },
@@ -2568,6 +2594,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Step 5: manage every position daily', 'At +1R the stop moves to breakeven. At +2R it trails 3 ATRs behind the best close. At +3R it banks a third of the position. The night before earnings, a large position without a cushion is halved. If the trend breaks (a close below the 50-day average with a weak score) it exits rather than waiting for the stop. Stops only ever move in the direction of the trade.'],
         ['Index core', 'When the market view is Risk-on or Caution but there are not enough good stock ideas, it keeps the idle cash invested in the TMXI index fund (a "core and satellite" approach). The core is sold first when the view worsens or a strong stock idea needs the cash.'],
         ['Hedging and shorting', 'On a margin account in a Risk-off market it may short the TMXI index fund against its remaining stocks, removing much of the market risk while keeping the stock-specific bets. It may also short up to two of the weakest stocks in clear downtrends, at half size, avoiding hard-to-borrow names and imminent earnings. On a cash account it simply holds more cash.'],
+        ['Market Trader styles', 'Chosen in Practice settings. <b>Conservative</b> (the default, and always used in Career levels and the Daily challenge): exactly your account type, risk per trade and loss limits, positions capped at 15% or your own limit if lower. <b>Balanced</b>: two freedoms, a margin account (so it can hedge and short even if you have a cash account) and positions up to 25% in its best ideas; your risk per trade and loss limits still apply. <b>Aggressive</b>: every freedom, margin, 25% positions, 2% risk per trade, no daily-loss or drawdown limits, and it may buy just before earnings. The style is recorded as the first entry of its decision log.'],
+        ['What the styles teach', 'Tested on the same 28 markets, Balanced did slightly better than Conservative (about +1% a year more, with similar drawdowns), because hedging and concentrating in its best ideas genuinely help. Aggressive did <b>not</b> do better: the extra risk mostly made the bad sessions worse (the worst drawdown grew from about −17% to −19%). More freedom is not the same as more skill. To see it yourself, replay one market with each style by reusing its seed.'],
         ['Following the risk rules', 'If its own account loses more than your daily loss limit in one day, it opens nothing new the next day. If its drawdown passes 60% of your limit it halves its risk per trade, and beyond the limit it stops adding risk until it recovers.'],
         ['The decision log', 'In the debrief, every action is listed in date order. Tap an entry to open it: the reasoning step by step, the plan and sizing maths, a table of the exact numbers it used, and <b>What happened</b>, meaning the fill price and the final result of the trade in dollars and R. Use the filters to see only market views, entries, exits, risk management or the ideas it passed on.'],
         ['Log actions', '<b>MARKET VIEW</b> change of regime read · <b>BUY / SHORT</b> new position · <b>CORE</b> idle cash into the index fund · <b>REDUCE CORE</b> index core sold · <b>RAISE STOP</b> stop tightened · <b>TAKE PROFIT</b> a third banked · <b>TRIM</b> cut before earnings · <b>SELL / COVER</b> thesis broken or exposure too high · <b>STOP HIT</b> a stop filled during the day · <b>HEDGE / UNHEDGE</b> index short added or removed · <b>PASS</b> a good idea skipped · <b>RULES</b> a risk rule changed its behaviour.'],
@@ -2735,7 +2763,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       endPerf: { you: true, index: true, equal: true, momentum: true, value: true, rules: true, trader: true },
       trFilter: 'all',
       newsMine: false, editOrder: null, edit: {}, ticket: blankTicket(), banner: null,
-      practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '' }
+      practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '', traderStyle: 'conservative' }
     }
   };
   TM.App = App;
@@ -2948,7 +2976,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     },
     theme() { const cur = App.progress.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'); App.progress.theme = cur === 'dark' ? 'light' : 'dark'; saveProgress(); applyTheme(); render(); },
     resume() { if (App.game) { App.screen = App.game.status === 'active' ? 'game' : 'end'; render(); } },
-    practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed }); },
+    practice() { const p = App.ui.practice; startGame({ mode: 'practice', scenario: p.scenario, days: Number(p.days), capital: Number(p.capital), margin: p.margin === true || p.margin === 'true', costModel: p.costModel, seed: p.seed, traderStyle: p.traderStyle }); },
     level(arg) { startGame({ mode: 'level', level: Number(arg) }); },
     daily() { startGame({ mode: 'daily' }); },
     next() { nextDays(1); },
@@ -3122,6 +3150,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
           <label class="f"><span>Starting capital</span><select data-bind="practice.capital">${[10000, 100000, 1000000].map((d) => `<option value="${d}" ${Number(p.capital) === d ? 'selected' : ''}>${F.money(d)}</option>`).join('')}</select></label></div>
           <div class="split"><label class="f"><span>Account</span><select data-bind="practice.margin"><option value="false" ${String(p.margin) === 'false' ? 'selected' : ''}>Cash (no shorting)</option><option value="true" ${String(p.margin) === 'true' ? 'selected' : ''}>Margin (2x, shorting)</option></select></label>
           <label class="f"><span>Trading costs</span><select data-bind="practice.costModel">${Object.entries(TM.COST_MODELS).map(([k, v]) => `<option value="${k}" ${p.costModel === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label></div>
+          <label class="f"><span>Market Trader style ${q('trader', 'Market Trader styles')}</span><select data-bind="practice.traderStyle" data-rerender="1">${Object.entries(TM.TRADER_STYLES).map(([k, v]) => `<option value="${k}" ${p.traderStyle === k ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
+          <div class="tiny faint" style="margin-top:4px">${esc(TM.TRADER_STYLES[p.traderStyle || 'conservative'].summary)}</div>
           <label class="f"><span>Seed (optional: replay an exact market)</span><input type="text" inputmode="numeric" placeholder="random" value="${esc(p.seed)}" data-bind="practice.seed"></label>
           <button class="btn primary" style="width:100%;margin-top:12px" data-act="practice">Start practice</button>
         </section>
@@ -3675,7 +3705,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ${e.during ? '' : `<div class="tiny faint">Decided after the close on ${F.date(e.t)}; orders execute from the next open.</div>`}</div></details>`;
     };
     return `<div class="section panel pad" id="trader-log"><div class="row"><h3 class="grow">Market Trader: what a professional did with the same data</h3>${'<button class="qbtn" data-act="help" data-arg="trader" aria-label="Help: Market Trader">?</button>'}</div>
-      <p class="small muted">Same market, same information, same ${a.margin ? 'margin' : 'cash'} account, same costs and your risk rules. It never saw the future: each decision below uses only what was visible at that evening's close, exactly as you saw it.</p>
+      ${(() => { const ts = TM.traderStyleOf(g); return `<div class="ticket-note" style="margin:4px 0 8px"><b>Style: ${esc(ts.label)}.</b> ${esc(ts.summary)}${g.mode === 'practice' ? ' To compare styles, start a new Practice session with the same scenario, length and seed ' + g.seed + ', and pick another style.' : ''}</div>`; })()}
+      <p class="small muted">Same market, same information and same costs as you${TM.traderStyleOf(g).margin ? '' : `, the same ${a.margin ? 'margin' : 'cash'} account and your risk rules`}. It never saw the future: each decision below uses only what was visible at that evening's close, exactly as you saw it.</p>
       <div class="tablewrap"><table><thead><tr><th></th><th class="num">You</th><th class="num">Market Trader</th><th class="num">Index fund</th></tr></thead><tbody>
         ${row('Return', (m) => `<span class="${cls(m.total)}">${F.spct(m.total)}</span>`)}${row('Sharpe ratio', (m) => F.num(m.sharpe))}${row('Max drawdown', (m) => `<span class="down">${F.pct(m.maxDD)}</span>`)}
         ${row('Closed trades', (m) => String(m.trades))}${row('Win rate', (m) => F.pct(m.winRate, 0))}${row('Average R', (m) => F.num(m.avgR))}${row('Avg exposure', (m) => F.pct(m.gross, 0))}${row('Trading costs', (m) => F.money(m.frictions))}

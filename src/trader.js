@@ -20,6 +20,17 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     'Risk-off': { gross: 0.35, maxPos: 5, entries: 1, note: 'the market is in a downtrend or unusually volatile, so capital is protected first' }
   };
 
+  // Styles: which exemptions from the player's rules the trader is given (measured in testing).
+  const STYLES = {
+    conservative: { label: 'Conservative', margin: null, posCap: 15, riskPct: null, lossRules: true, earningsOk: false,
+      summary: 'Plays by exactly your rules: your account type, your risk per trade, your loss limits, and positions capped at 15% (or your own limit if lower).' },
+    balanced: { label: 'Balanced', margin: true, posCap: 25, riskPct: null, lossRules: true, earningsOk: false,
+      summary: 'Two freedoms: a margin account (so it can hedge and short) and positions of up to 25% in its best ideas. Your risk per trade and loss limits still apply.' },
+    aggressive: { label: 'Aggressive', margin: true, posCap: 25, riskPct: 2, lossRules: false, earningsOk: true,
+      summary: 'Every freedom: margin account, positions up to 25%, 2% risk per trade, no daily-loss or drawdown limits, and it may buy just before earnings.' }
+  };
+  const styleOf = (game) => STYLES[game.traderStyle] || STYLES.conservative;
+
   const pct = (x, dp) => (x >= 0 ? '+' : '') + (x * 100).toFixed(dp == null ? 1 : dp) + '%';
   const pp = (x, dp) => (x * 100).toFixed(dp == null ? 1 : dp) + '%';
   const usd = (x) => '$' + x.toFixed(2);
@@ -174,20 +185,28 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     const ex = TM.exposures(w, a, t);
 
     // risk rules from the player's own settings
-    const riskPct = Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2) / 100;
-    const maxPosPct = Math.min(rules.maxPosPct || 25, 15) / 100;
+    const style = styleOf(game);
+    if (!st.styleLogged) {
+      st.styleLogged = true;
+      add({ kind: 'view', action: 'STYLE', title: `Trading style: ${style.label}`, why: [style.summary,
+        style.margin ? 'It uses a margin account even if yours is a cash account.' : `It uses the same ${a.margin ? 'margin' : 'cash'} account type as you.`],
+        data: [['Account', a.margin ? 'Margin' : 'Cash'], ['Risk per trade', style.riskPct ? `${style.riskPct}% (exempt from your rule)` : `${Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2)}% (your rule)`],
+          ['Position cap', style.margin ? `${style.posCap}% (exempt from your rule)` : `${Math.min(rules.maxPosPct || 25, style.posCap)}%`], ['Loss limits', style.lossRules ? 'yours apply' : 'none'], ['Buying before earnings', style.earningsOk ? 'allowed' : 'avoided']] });
+    }
+    const riskPct = (style.riskPct || Math.min(Math.max(rules.maxRiskPct || 1, 0.25), 2)) / 100;
+    const maxPosPct = (style.margin ? style.posCap : Math.min(rules.maxPosPct || 25, style.posCap)) / 100;
     const dayRet = E.length > 1 ? eq / E[E.length - 2].eq - 1 : 0;
     const ddNow = eq / a.peak - 1;
     let riskScale = 1, blockNew = false;
     const ruleNotes = [];
-    if (rules.dailyLossPct && dayRet <= -rules.dailyLossPct / 100) {
+    if (style.lossRules && rules.dailyLossPct && dayRet <= -rules.dailyLossPct / 100) {
       blockNew = true;
       ruleNotes.push(`Lost ${pct(dayRet)} today, beyond the ${rules.dailyLossPct}% daily loss limit: no new positions tomorrow (cool-off).`);
     }
-    if (rules.maxDDPct && ddNow <= -rules.maxDDPct / 100) {
+    if (style.lossRules && rules.maxDDPct && ddNow <= -rules.maxDDPct / 100) {
       blockNew = true;
       ruleNotes.push(`Drawdown ${pct(ddNow)} breaches the ${rules.maxDDPct}% limit: no new risk until the account recovers.`);
-    } else if (rules.maxDDPct && ddNow <= -rules.maxDDPct * 0.6 / 100) {
+    } else if (style.lossRules && rules.maxDDPct && ddNow <= -rules.maxDDPct * 0.6 / 100) {
       riskScale = 0.5;
       ruleNotes.push(`Drawdown ${pct(ddNow)} is past 60% of the ${rules.maxDDPct}% limit: risk per trade halved.`);
     }
@@ -354,7 +373,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       if (x.score < minScore) break;
       if (a.pos[x.sym] || working(x.sym).length) continue;
       const fail = x.px < x.s50 || x.slope <= 0 ? 'the score is high but the price is not in an uptrend (below or flattening 50-day average), and buying against the trend is avoided'
-        : x.daysToE <= 3 ? `earnings are due in ${x.daysToE} trading days; entering just before a ±${pp(x.implied)} event turns a planned trade into a coin toss`
+        : x.daysToE <= 3 && !style.earningsOk ? `earnings are due in ${x.daysToE} trading days; entering just before a ±${pp(x.implied)} event turns a planned trade into a coin toss`
           : x.r5 > 0.08 ? `it is up ${pct(x.r5)} in five days; the bot waits for a pullback rather than chase`
             : (sectorVal[x.sector] || 0) / eq > SECTOR_CAP - 0.05 ? `${x.sector} already takes ${pp((sectorVal[x.sector] || 0) / eq, 0)} of equity (cap ${pp(SECTOR_CAP, 0)})`
               : x.news.some((n) => n.tone < 0) ? 'there was negative company news in the last three days' : null;
@@ -435,5 +454,5 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     }
   }
 
-  Object.assign(TM, { marketTrader, traderReadMarket: readMarket, traderScore: scoreStocks });
+  Object.assign(TM, { marketTrader, traderReadMarket: readMarket, traderScore: scoreStocks, TRADER_STYLES: STYLES, traderStyleOf: styleOf });
 })(TM);
