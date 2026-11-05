@@ -54,12 +54,13 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     const world = TM.generateWorld({ seed, scenario, sessionDays: days });
     const player = TM.newAccount('you', cfg.name || 'You', capital, { margin, costModel, track: true, rules });
     const bots = {};
-    for (const b of TM.BOT_DEFS) bots[b.id] = TM.newAccount(b.id, b.label, capital, { margin: false, costModel });
+    for (const b of TM.BOT_DEFS) bots[b.id] = TM.newAccount(b.id, b.label, capital, { margin: b.id === 'trader' ? margin : false, costModel, rules: b.id === 'trader' ? rules : null });
     const game = {
       v: 3, seed, scenario, hidden: pick === 'hidden', mode: lv ? 'level' : daily ? 'daily' : 'practice',
       level: lv ? lv.id : null, daily, days, capital, margin, costModel, t: world.start,
       player, bots, botCfg: Object.assign({}, TM.DEFAULT_RULES_BOT),
-      status: 'active', result: null, unranked: !!cfg.unranked, created: Date.now(), ddWarned: false
+      status: 'active', result: null, unranked: !!cfg.unranked, created: Date.now(), ddWarned: false,
+      traderLog: [], traderState: null
     };
     TM.recordEquity(world, player, world.start);
     for (const id in bots) TM.recordEquity(world, bots[id], world.start);

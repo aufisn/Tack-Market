@@ -37,8 +37,10 @@
     { id: 'equal', label: 'Equal-weight', v: '--s-equal' },
     { id: 'momentum', label: 'Momentum bot', v: '--s-momentum' },
     { id: 'value', label: 'Value bot', v: '--s-value' },
-    { id: 'rules', label: 'Rules bot', v: '--s-rules' }
+    { id: 'rules', label: 'Rules bot', v: '--s-rules' },
+    { id: 'trader', label: 'Market Trader', v: '--s-trader' }
   ];
+  const botDefs = (g) => TM.BOT_DEFS.filter((b) => g.bots[b.id]);
   const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const narrow = () => !!(window.matchMedia && matchMedia('(max-width: 599px)').matches);
   const paned = () => !!(window.matchMedia && matchMedia('(max-width: 1099px)').matches);
@@ -55,8 +57,9 @@
     progress: Object.assign(defaultProgress(), store.get('progress') || {}),
     ui: {
       sel: 'TMXI', tab: 'positions', pane: 'chart', helpQ: '', helpFrom: 'home', helpSec: null, range: 126, sma20: true, sma50: true, showVol: true, sector: 'All', sort: 'sector', hover: null,
-      perf: { you: true, index: true, equal: false, momentum: false, value: false, rules: false },
-      endPerf: { you: true, index: true, equal: true, momentum: true, value: true, rules: true },
+      perf: { you: true, index: true, equal: false, momentum: false, value: false, rules: false, trader: true },
+      endPerf: { you: true, index: true, equal: true, momentum: true, value: true, rules: true, trader: true },
+      trFilter: 'all',
       newsMine: false, editOrder: null, edit: {}, ticket: blankTicket(), banner: null,
       practice: { scenario: 'random', days: 60, capital: 100000, margin: false, costModel: 'retail', seed: '', name: '' }
     }
@@ -204,11 +207,13 @@
     render();
     window.scrollTo(0, 0);
   }
+  // A refresh returns to where the player was: the board of a running session, or the home screen.
+  // A finished session never reopens on its own; its debrief is one tap away on the home screen.
   function loadSaved() {
     const g = store.get('save');
     if (!g || g.v !== 3) return false;
     try { App.world = TM.worldFor(g); App.game = g; } catch (e) { return false; }
-    App.screen = g.status === 'active' ? 'game' : 'end';
+    App.screen = g.status === 'active' && (App.progress.lastScreen || 'game') === 'game' ? 'game' : 'home';
     return true;
   }
   function onSessionEnd() {
@@ -371,8 +376,9 @@
       render();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
+    closeSession() { App.screen = 'home'; App.ui.banner = null; render(); window.scrollTo(0, 0); },
     endSession() {
-      if (!confirm(G().mode === 'level' ? 'End this level attempt now? It will count as a fail.' : 'End this session now and see the debrief?')) return;
+      if (!confirm(G().mode === 'level' ? 'Exit this level attempt now? It will count as a fail. You will see the debrief, then can close it.' : 'Exit this session now? You will see the debrief, then can close it to return to the home screen.')) return;
       TM.endEarly(W(), G()); onSessionEnd(); saveGame(); render();
     },
     viewBoard() { App.screen = 'game'; App.ui.banner = null; render(); },
@@ -432,6 +438,7 @@
         <div class="row"><label class="small muted">Your name <input type="text" maxlength="24" value="${esc(pr.name)}" data-bind="name.x" style="width:140px;margin-left:6px"></label><button class="btn sm" data-act="help" data-arg="start">? Help guide</button><button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐ Theme</button></div></div>
       ${active ? `<div class="panel pad continue resume"><div><div class="label" style="color:var(--accent)">Session in progress</div><b style="font-size:16px">${esc(TM.sessionLabel(saved))}</b><div class="small muted">Day ${saved.t - 250} of ${saved.days} · equity ${F.money(saved.player.equity[saved.player.equity.length - 1].eq)}</div></div>
         <div class="row"><button class="btn sell" data-act="endFromHome">End now</button><button class="btn primary" data-act="resume">Continue session ▸</button></div></div>` : ''}
+      ${saved && !active ? `<div class="panel pad continue"><div><div class="label">Last session finished</div><b>${esc(TM.sessionLabel(saved))}</b><div class="small muted">${saved.result && saved.result.status === 'passed' ? 'Passed · ' : saved.result && saved.result.status === 'failed' ? 'Failed · ' : ''}final equity ${F.money(saved.player.equity[saved.player.equity.length - 1].eq)}</div></div><button class="btn" data-act="resume">View debrief</button></div>` : ''}
       ${storageOK ? '' : '<div class="panel pad continue" style="border-color:var(--down)"><div><b>This browser is blocking storage</b><div class="small muted">Progress will not be kept between visits. Open the file in Chrome or Samsung Internet directly, or use Account &gt; Export save before closing.</div></div></div>'}
       <div class="cards">
         <section class="panel pad card"><h3>Practice ${q('practice', 'practice settings')}</h3><div class="sub">Pick the market type and account, then trade freely. Rules warn but don't block.</div>
@@ -475,7 +482,7 @@
       <div class="stat"><b class="${cls(m.total)}">${F.spct(m.total)}</b><span>vs index <span class="${cls(m.excess)}">${F.spct(m.excess)}</span></span></div>
       <div class="stat hide-md"><b class="${m.currentDD < -0.001 ? 'down' : ''}">${F.pct(m.currentDD)}</b><span>Drawdown</span></div>
       <div class="row act-btns">${active ? `<button class="btn primary" data-act="next" title="Shortcut: N">Next day ▸</button><button class="btn blue" data-act="next5">+5 days</button>` : `<button class="btn primary" data-act="resume">View debrief</button>`}</div>
-      ${active ? '<button class="btn ghost sm" data-act="endSession" title="End this session now and see the debrief">End</button>' : ''}
+      ${active ? '<button class="btn sm exitbtn" data-act="endSession" title="Abort this session now and see the debrief">✕ Exit</button>' : '<button class="btn sm" data-act="closeSession" title="Close and return to the home screen">✕ Close</button>'}
       <button class="btn ghost sm qbtn" data-act="help" data-arg="start" title="Help guide" aria-label="Help guide">?</button>
       <button class="btn ghost sm" data-act="theme" title="Toggle light/dark">◐</button>
     </header>`;
@@ -718,7 +725,8 @@
     return `<div class="metrics">${cards.map(([k, v, c]) => `<div class="metric"><b class="${c}">${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
   function legend(sel, act) {
-    return `<div class="legend">${SERIES.map((s) => `<button class="${sel[s.id] ? 'on' : ''}" data-act="${act || 'perf'}" data-arg="${s.id}" aria-pressed="${!!sel[s.id]}" title="Show or hide ${s.label}"><i style="background:var(${s.v})"></i>${s.label}</button>`).join('')}</div>`;
+    const g = G();
+    return `<div class="legend">${SERIES.filter((s) => s.id === 'you' || (g && g.bots[s.id])).map((s) => `<button class="${sel[s.id] ? 'on' : ''}" data-act="${act || 'perf'}" data-arg="${s.id}" aria-pressed="${!!sel[s.id]}" title="Show or hide ${s.label}"><i style="background:var(${s.v})"></i>${s.label}</button>`).join('')}</div>`;
   }
   function tabPerformance() {
     const w = W(), g = G(), m = TM.metrics(w, g.player), c = g.player.costs;
@@ -733,7 +741,7 @@
   }
   function tabLeaderboard() {
     const w = W(), g = G();
-    const accts = [g.player].concat(TM.BOT_DEFS.map((b) => g.bots[b.id]));
+    const accts = [g.player].concat(botDefs(g).map((b) => g.bots[b.id]));
     const rows = accts.map((a) => ({ a, m: TM.metrics(w, a) })).sort((x, y) => y.m.total - x.m.total);
     const cfg = g.botCfg;
     const fld = (k, label, step) => `<label class="f"><span>${label}</span><input type="number" min="0" step="${step || 1}" value="${cfg[k]}" data-bind="botCfg.${k}" data-num="1"></label>`;
@@ -828,9 +836,9 @@
     const segs = regimeSegments();
     const trades = a.trades.slice().sort((x, y) => y.net - x.net);
     const tline = (t) => `<div class="news-item"><span class="when">${F.sdate(t.openDay)}</span><span><b class="mono">${t.sym}</b> ${t.dir > 0 ? 'long' : 'short'} · <span class="${cls(t.net)}">${F.smoney(t.net)}</span>${t.r != null ? ` · ${t.r.toFixed(2)}R` : ''} · ${t.closeDay - t.openDay}d · ${esc(t.exitReason)}${t.note ? ` · <i class="faint">${esc(t.note)}</i>` : ''}</span></div>`;
-    const accts = [a].concat(TM.BOT_DEFS.map((b) => g.bots[b.id])).map((x) => ({ x, m: TM.metrics(w, x) })).sort((p, q) => q.m.total - p.m.total);
+    const accts = [a].concat(botDefs(g).map((b) => g.bots[b.id])).map((x) => ({ x, m: TM.metrics(w, x) })).sort((p, q) => q.m.total - p.m.total);
     return `<header class="topbar"><div class="brand" data-act="home">TACK<small>V3</small></div><div class="stat"><b>${esc(TM.sessionLabel(g))}</b><span>${F.date(w.start)} → ${F.date(g.t)}</span></div><div class="spacer"></div>
-      <button class="btn" data-act="viewBoard">Review board</button><button class="btn" data-act="exportCsv">Trades CSV</button><button class="btn primary" data-act="home">New session</button><button class="btn ghost sm qbtn" data-act="help" data-arg="debrief" aria-label="Help guide">?</button><button class="btn ghost sm" data-act="theme">◐</button></header>
+      <button class="btn" data-act="viewBoard">Review board</button><button class="btn" data-act="exportCsv">Trades CSV</button><button class="btn ghost sm qbtn" data-act="help" data-arg="debrief" aria-label="Help guide">?</button><button class="btn primary" data-act="closeSession" title="Close the debrief and return to the home screen">✕ Close</button><button class="btn ghost sm" data-act="theme">◐</button></header>
       <div class="home">
       <div class="panel result"><div class="label">${g.mode === 'level' ? 'Evaluation result' : 'Session debrief'}</div><div class="big ${cls(m.total)}" style="margin:8px 0">${head} ${F.spct(m.total)}</div>
         <div class="muted">${res.reason ? esc(res.reason) + ' ' : ''}Index fund: ${F.spct(m.benchTotal)} · Excess: <span class="${cls(m.excess)}">${F.spct(m.excess)}</span> · Sharpe ${F.num(m.sharpe)} vs ${F.num(bm.sharpe)} · Max DD ${F.pct(m.maxDD)} vs ${F.pct(bm.maxDD)}</div>
@@ -840,6 +848,7 @@
         <div class="label" style="margin:10px 0 4px">What the market was really doing · ${esc(TM.SCENARIOS[g.scenario].label)}${g.hidden ? ' (it was hidden from you)' : ''}</div><canvas id="regimeChart" role="img" aria-label="Market regimes"></canvas>
         <div class="regimes">${segs.map((s) => `<span class="chip"><span class="dot" style="background:var(--reg-${s.r})"></span>${TM.REGIMES[s.r].label} · ${s.to - s.from + 1}d · <span class="${cls(s.ret)}">${F.spct(s.ret)}</span></span>`).join('')}</div>
         <div class="tiny faint" style="margin-top:6px">Market seed ${g.seed}. Enter it in Practice with the same scenario and length to replay this exact market.</div></div>
+      ${viewTraderSection(w, g)}
       <div class="section panel pad"><h3>Your coach</h3><div class="coach">${coach.map((c) => `<div class="coach-item ${c.tone}"><b>${esc(c.title)}</b><p>${esc(c.detail)}</p></div>`).join('')}</div></div>
       <div class="section panel pad"><h3>Statistics</h3>${metricCards(m)}</div>
       <div class="section cards"><div class="panel pad"><h3 style="font-size:15px;margin-bottom:6px">Best trades</h3>${trades.slice(0, 3).map(tline).join('') || '<div class="faint">No closed trades.</div>'}</div>
@@ -909,6 +918,99 @@
         <div class="footer">All companies, prices and news in Tack Market are fictional. Nothing here is investment advice.</div>
       </div>
       <button class="totop noprint" id="toTop" data-act="toTop" aria-label="Back to top">↑ Top</button>`;
+  }
+
+
+  // ---------- Market Trader decision log (debrief) ----------
+  const TR_GROUPS = { all: 'All', view: 'Market view', entry: 'Entries', exit: 'Exits', risk: 'Risk management', skip: 'Passed on' };
+  const TR_BADGE = { BUY: 'up', SHORT: 'down', CORE: 'up', SELL: 'down', COVER: 'up', 'TAKE PROFIT': 'up', TRIM: 'warn', 'RAISE STOP': 'info', HEDGE: 'warn', UNHEDGE: 'info',
+    'REDUCE CORE': 'warn', 'MARKET VIEW': 'info', RULES: 'warn', PASS: 'faint', 'STOP HIT': 'down', 'TARGET HIT': 'up' };
+  function traderTimeline(w, g) {
+    const a = g.bots.trader, log = (g.traderLog || []).slice();
+    for (const f of a.fills) {
+      if (f.source === 'margin') log.push({ t: f.d, during: true, kind: 'risk', action: 'MARGIN CALL', sym: f.sym, qty: f.qty, px: f.px, title: `Broker liquidated ${f.qty} ${f.sym}`, why: ['Equity fell below the maintenance requirement.'] });
+      if (f.role !== 'stop' && f.role !== 'target') continue;
+      const tr = a.trades.find((x) => x.exits.some((e) => e.orderId === f.id)) || a.openTrades[f.sym];
+      log.push({ t: f.d, during: true, kind: 'exit', action: f.role === 'stop' ? 'STOP HIT' : 'TARGET HIT', sym: f.sym, qty: f.qty, px: f.px, fillId: f.id,
+        title: `${f.role === 'stop' ? 'Stop hit' : 'Target hit'}: ${f.side === 'sell' ? 'sold' : 'bought back'} ${f.qty} ${f.sym} at $${F.px(f.px)}${f.gapped ? ' (gapped through the stop)' : ''}`,
+        why: [f.role === 'stop' ? (f.gapped ? 'The stock opened beyond the stop, so the order filled at the open: the loss is larger than the planned 1R. Gaps are why position size matters more than the stop level.' : 'The protective stop placed at entry did its job: the trade was wrong or the trend ended, and the loss or locked-in gain was taken automatically without hesitation.') : 'The take-profit order filled.'],
+        trade: tr });
+    }
+    log.sort((x, y) => x.t - y.t || (x.during ? -1 : 0) - (y.during ? -1 : 0));
+    return log;
+  }
+  function traderOutcome(w, g, e) {
+    const a = g.bots.trader;
+    if (e.during) {
+      const tr = e.trade;
+      return tr && tr.closeDay != null ? { cls: cls(tr.net), text: `Trade closed: ${F.smoney(tr.net)}${tr.r != null ? ` (${tr.r.toFixed(2)}R)` : ''} after ${tr.closeDay - tr.openDay} days` } : null;
+    }
+    if (!e.orderId) return null;
+    const o = a.orders.find((x) => x.id === e.orderId);
+    const fill = a.fills.find((f) => f.id === e.orderId);
+    if (!fill) return { cls: 'faint', text: o ? `Order ${o.status}${o.reason ? ': ' + o.reason : ''}` : 'Order not filled' };
+    const head = `Filled ${fill.qty} at $${F.px(fill.px)} on ${F.sdate(fill.d)}`;
+    if (e.kind === 'entry') {
+      const tr = a.trades.find((x) => x.openOrderId === e.orderId);
+      const why = (r) => r === 'manual' ? 'its own sell decision' : r === 'stop' ? 'its stop' : r === 'target' ? 'its target' : r;
+      if (tr) return { cls: cls(tr.net), text: `${head} → closed ${F.sdate(tr.closeDay)} by ${why(tr.exitReason)}: ${F.smoney(tr.net)} (${F.spct(tr.retPct)}${tr.r != null ? `, ${tr.r.toFixed(2)}R` : ''})` };
+      const op = a.openTrades[e.sym] && a.openTrades[e.sym].openOrderId === e.orderId ? a.pos[e.sym] : null;
+      if (op) { const last = w.c[w.bySym[e.sym]][g.t], pnl = (last - op.avg) * op.qty; return { cls: cls(pnl), text: `${head} → still open at the end: ${F.smoney(pnl)} unrealised` }; }
+      return { cls: '', text: head };
+    }
+    const tr = a.trades.find((x) => x.exits.some((ex) => ex.orderId === e.orderId));
+    if (tr) return { cls: cls(tr.net), text: `${head} → whole trade ${F.smoney(tr.net)}${tr.r != null ? ` (${tr.r.toFixed(2)}R)` : ''} over ${tr.closeDay - tr.openDay} days` };
+    return { cls: '', text: head };
+  }
+  function traderLessons(w, g, mY, mT) {
+    const a = g.bots.trader, out = [];
+    const entries = (g.traderLog || []).filter((e) => e.action === 'BUY' || e.action === 'SHORT');
+    const maxRisk = entries.length ? Math.max(...entries.map((e) => e.riskPct || 0)) : 0;
+    const views = (g.traderLog || []).filter((e) => e.action === 'MARKET VIEW');
+    const passes = (g.traderLog || []).filter((e) => e.action === 'PASS').length;
+    const stops = a.fills.filter((f) => f.role === 'stop').length;
+    const youTraded = g.player.fills.length > 0;
+    if (!youTraded) out.push(`You placed no trades, so your result is just interest on cash. Market Trader shows what taking measured risk in this market would have looked like, losses included.`);
+    else if (mT.maxDD > mY.maxDD + 0.02) out.push(`Its worst drawdown was ${F.pct(mT.maxDD)} against your ${F.pct(mY.maxDD)}. Every position had a stop sized so that one loss cost about ${F.pct(maxRisk, 2)} of equity at most.`);
+    else if (mY.maxDD > mT.maxDD + 0.02) out.push(`You kept drawdown lower (${F.pct(mY.maxDD)} vs ${F.pct(mT.maxDD)}). Good risk control on your part.`);
+    const seq = views.map((v) => v.regime || v.title.split(' ').pop());
+    if (views.length > 1) out.push(`It changed its market view ${views.length - 1} time${views.length > 2 ? 's' : ''} (${(seq.length > 6 ? ['…'].concat(seq.slice(-6)) : seq).join(' → ')}), adjusting total exposure each time rather than holding the same amount through every condition.`);
+    out.push(`It let ${stops} stop${stops === 1 ? '' : 's'} do the selling, moved stops only in the direction of the trade, and passed on ${passes} high-scoring idea${passes === 1 ? '' : 's'} because the timing was wrong (earnings imminent, chasing a spike, or against the trend).`);
+    if (mT.winRate != null) out.push(`Its win rate was ${F.pct(mT.winRate, 0)}${mY.winRate != null ? ` (yours ${F.pct(mY.winRate, 0)})` : ''}, with an average win of ${mT.avgWin != null ? F.money(mT.avgWin) : '–'} against an average loss of ${mT.avgLoss != null ? F.money(-mT.avgLoss) : '–'}. Professionals are often wrong more than half the time; they make money by keeping losses small and letting winners run.`);
+    if (mT.excess < 0) out.push(`It did not beat the index this time (${F.spct(mT.excess)}). Disciplined risk control costs some return in strong rallies; the payoff shows in falling markets. Judge a process over many sessions, not one.`);
+    return out;
+  }
+  function viewTraderSection(w, g) {
+    const a = g.bots.trader;
+    if (!a) return '';
+    const mY = TM.metrics(w, g.player), mT = TM.metrics(w, a), mI = TM.metrics(w, g.bots.index);
+    const row = (k, f) => `<tr><td>${k}</td>${[mY, mT, mI].map((m) => `<td class="num">${f(m)}</td>`).join('')}</tr>`;
+    const tl = traderTimeline(w, g);
+    const filt = App.ui.trFilter || 'all';
+    const counts = {};
+    for (const e of tl) counts[e.kind] = (counts[e.kind] || 0) + 1;
+    const shown = tl.filter((e) => filt === 'all' || e.kind === filt);
+    const item = (e) => {
+      const out = traderOutcome(w, g, e);
+      const when = e.during ? `During ${F.sdate(e.t)}` : `${F.sdate(e.t)} close`;
+      return `<details class="tlog"><summary><span class="tlog-when">${when}</span><span class="tbadge ${TR_BADGE[e.action] || ''}">${esc(e.action)}</span><span class="tlog-title">${esc(e.title)}</span>${out ? `<span class="tlog-out ${out.cls}">${esc(out.text.split(' → ').pop())}</span>` : ''}</summary>
+        <div class="tlog-body">${e.why && e.why.length ? `<div class="label">Reasoning</div><ol>${e.why.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}
+        ${e.plan ? `<div class="label">Plan and sizing</div><p>${esc(e.plan)}</p>` : ''}
+        ${e.data && e.data.length ? `<div class="label">Data it used</div><div class="tlog-data">${e.data.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>` : ''}
+        ${out ? `<div class="label">What happened</div><p class="${out.cls}">${esc(out.text)}</p>` : ''}
+        ${e.during ? '' : `<div class="tiny faint">Decided after the close on ${F.date(e.t)}; orders execute from the next open.</div>`}</div></details>`;
+    };
+    return `<div class="section panel pad" id="trader-log"><div class="row"><h3 class="grow">Market Trader: what a professional did with the same data</h3>${'<button class="qbtn" data-act="help" data-arg="trader" aria-label="Help: Market Trader">?</button>'}</div>
+      <p class="small muted">Same market, same information, same ${a.margin ? 'margin' : 'cash'} account, same costs and your risk rules. It never saw the future: each decision below uses only what was visible at that evening's close, exactly as you saw it.</p>
+      <div class="tablewrap"><table><thead><tr><th></th><th class="num">You</th><th class="num">Market Trader</th><th class="num">Index fund</th></tr></thead><tbody>
+        ${row('Return', (m) => `<span class="${cls(m.total)}">${F.spct(m.total)}</span>`)}${row('Sharpe ratio', (m) => F.num(m.sharpe))}${row('Max drawdown', (m) => `<span class="down">${F.pct(m.maxDD)}</span>`)}
+        ${row('Closed trades', (m) => String(m.trades))}${row('Win rate', (m) => F.pct(m.winRate, 0))}${row('Average R', (m) => F.num(m.avgR))}${row('Avg exposure', (m) => F.pct(m.gross, 0))}${row('Trading costs', (m) => F.money(m.frictions))}
+      </tbody></table></div>
+      <div class="label" style="margin:12px 0 4px">Lessons from the comparison</div><ul class="lessons">${traderLessons(w, g, mY, mT).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+      <div class="row" style="margin:12px 0 6px;flex-wrap:wrap;gap:6px"><span class="label grow">Decision log · ${tl.length} entries</span>
+        <button class="btn sm ghost" data-act="trExpand" data-arg="1">Expand all</button><button class="btn sm ghost" data-act="trExpand" data-arg="0">Collapse all</button></div>
+      <div class="filters" style="margin-bottom:8px">${Object.entries(TR_GROUPS).map(([k, l]) => `<button class="${filt === k ? 'on' : ''}" data-act="trFilter" data-arg="${k}">${l}${k === 'all' ? ` (${tl.length})` : counts[k] ? ` (${counts[k]})` : ''}</button>`).join('')}</div>
+      <div class="tlog-list">${shown.map(item).join('') || '<div class="empty">No entries of this type.</div>'}</div></div>`;
   }
 
   // ---------- charts ----------
@@ -1045,8 +1147,8 @@
     const { ctx, W: Wd, H } = prep(cv);
     const w = W(), g = G(), start = w.start, t = g.t;
     const accts = { you: g.player };
-    for (const b of TM.BOT_DEFS) accts[b.id] = g.bots[b.id];
-    const series = SERIES.filter((s) => sel[s.id]).map((s) => ({ color: cssVar(s.v), you: s.id === 'you', vals: (opts && opts.dd ? TM.drawdown(accts[s.id].equity.map((e) => e.eq)).series : accts[s.id].equity.map((e) => e.eq / accts[s.id].startCash - 1)) }));
+    for (const b of botDefs(g)) accts[b.id] = g.bots[b.id];
+    const series = SERIES.filter((s) => sel[s.id] && accts[s.id]).map((s) => ({ color: cssVar(s.v), you: s.id === 'you', vals: (opts && opts.dd ? TM.drawdown(accts[s.id].equity.map((e) => e.eq)).series : accts[s.id].equity.map((e) => e.eq / accts[s.id].startCash - 1)) }));
     const padL = 6, padR = 52, top = 8, bottom = 18;
     let lo = 0, hi = 0;
     for (const s of series) for (const v of s.vals) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
@@ -1111,6 +1213,8 @@
     else if (App.screen === 'end' && App.game) root.innerHTML = viewEnd();
     else if (App.screen === 'help') root.innerHTML = viewHelp();
     else { App.screen = 'home'; root.innerHTML = viewHome(); }
+    const where = App.screen === 'game' && App.game && App.game.status === 'active' ? 'game' : App.screen === 'help' ? App.progress.lastScreen : 'home';
+    if (where !== App.progress.lastScreen) { App.progress.lastScreen = where; saveProgress(); }
     root.querySelectorAll('[data-keep]').forEach((el) => { if (keep[el.dataset.keep] != null) el.scrollTop = keep[el.dataset.keep]; });
     if (focusBind) { const el = root.querySelector(`[data-bind="${focusBind}"]`); if (el && el.type !== 'checkbox' && el.tagName !== 'SELECT') el.focus(); }
     drawCharts();
@@ -1186,6 +1290,8 @@
     if (window.matchMedia) matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (!App.progress.theme) render(); });
   }
   ACTIONS.noop = () => {};
+  ACTIONS.trFilter = (arg) => { App.ui.trFilter = arg; const el = document.getElementById('trader-log'); if (el) { el.outerHTML = viewTraderSection(W(), G()); } };
+  ACTIONS.trExpand = (arg) => { document.querySelectorAll('#trader-log details.tlog').forEach((d) => { d.open = arg === '1'; }); };
   ACTIONS.help = (arg) => {
     if (App.screen !== 'help') App.ui.helpFrom = App.screen;
     App.ui.helpSec = arg || 'start';

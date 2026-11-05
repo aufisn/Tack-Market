@@ -21,7 +21,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Session', 'A fixed number of trading days (30, 60, 120 or 250). At the end you get a debrief comparing you with the index and four bots on the identical market.'],
         ['Warm-up history', 'Every session starts with one year (250 days) of price history already generated, so you can study charts and trends before your first trade.'],
         ['Fictional data', 'All companies, prices, news, dates and analysts are invented and generated on your device. They are designed to behave like real stocks statistically, but none of it is real market data.'],
-        ['Saving', 'The game saves in your browser after every day and after every order. Because the whole market is fixed by its seed, closing or refreshing the page can never change what happens next.']
+        ['Saving', 'The game saves in your browser after every day and after every order. Because the whole market is fixed by its seed, closing or refreshing the page can never change what happens next. A refresh brings you back to where you were: the board if you were playing, otherwise the home screen. A finished session never reopens by itself; the home screen offers <b>View debrief</b> until you start a new one.'],
       ]
     },
     {
@@ -71,8 +71,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Drawdown', 'How far your equity is below its highest point so far. 0% means you are at a new high.'],
         ['◐ (theme)', 'Switches between dark and light mode.'],
         ['? (help)', 'Opens this guide at the section that matches where you are.'],
-        ['TACK', 'Tap the logo to go to the home screen. Your session keeps running in the background: use <b>Continue session</b> at the top of the home screen to return, or <b>End now</b> there to finish it and see the debrief.'],
-        ['End', 'Finishes the session early and goes to the debrief. In a Career level this counts as a failed attempt. The same option is in Account & rules.'],
+        ['TACK', 'Tap the logo to go to the home screen. A running session keeps going in the background: use <b>Continue session</b> at the top of the home screen to return to it, or <b>End now</b> to finish it.'],
+        ['✕ Exit', 'Aborts the running session at any time and goes to the debrief, so you can see how you did and what Market Trader did. It asks you to confirm first. In a Career level this counts as a failed attempt. The same option is in Account & rules. When you review a finished board, this button becomes <b>✕ Close</b>.'],
       ]
     },
     {
@@ -313,7 +313,30 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Rules bot: Max hold days', 'Sell at the next open after this many days regardless. 0 means no limit. Default 20.'],
         ['Rules bot: Position size %', 'Each new position’s size as a percentage of equity. Default 10%.'],
         ['Rules bot: Max positions', 'Most positions held at once. Default 8.'],
+        ['Market Trader', 'A bot that trades the way an experienced professional would, using only the information you can see, your account type, your trading costs and your risk rules. During the session you only see its performance; when the session ends, the debrief reveals every decision it made, why, which numbers it used, and how each one turned out. See the <b>Market Trader</b> section of this guide.'],
         ['Leaderboard columns', 'Return, volatility, Sharpe ratio, maximum drawdown, number of fills and total trading costs for each account.']
+      ]
+    },
+    {
+      id: 'trader', title: 'Market Trader',
+      intro: 'Market Trader is a teaching bot. It shows what a disciplined professional would have done with exactly the same market, information, account, costs and risk rules as you. Its full reasoning is revealed in the debrief, so you can compare it with your own decisions trade by trade.',
+      items: [
+        ['What it can see', 'Only what you see after each close: prices and volume up to today, moving averages, ATR and volatility, P/E and expected growth, analyst targets, past earnings reactions and the earnings and macro calendar, dividends and company headlines. It <b>never</b> sees tomorrow’s prices, the hidden market regime or fair values. The test suite proves this: scrambling every future price leaves its decisions unchanged.'],
+        ['What it shares with you', 'The same account type (cash or margin), the same cost model and your own risk rules from Account & rules: maximum risk per trade, maximum position size (it also caps itself at 15%), the daily loss limit and the drawdown limit. If you change your rules in Practice, it follows the new ones.'],
+        ['Step 1: read the market', 'Every evening it scores the overall market from visible evidence: the index against its 50- and 200-day averages, whether the 50-day average is rising, breadth (how many stocks are in uptrends), index volatility against normal, and the fall from the 52-week high. The result is <b>Risk-on</b>, <b>Caution</b> or <b>Risk-off</b>. A change of view must be confirmed on a second evening, unless the breakdown is severe.'],
+        ['What each market view means', '<b>Risk-on</b>: up to about 95% invested, up to 10 positions, two new ideas a day. <b>Caution</b>: about 65% invested, 8 positions, only the best ideas. <b>Risk-off</b>: about 35% invested, 5 positions, half-size trades; on a margin account it may also hedge with the index fund and short the weakest stocks.'],
+        ['Step 2: score every stock', 'Each of the 40 stocks is ranked on four factors, each compared with the other stocks: <b>trend</b> (30%: price against its 50- and 200-day averages and the slope of the 50-day), <b>momentum</b> (25%: six-month return excluding the last week), <b>value</b> (25%: upside to the analyst target and P/E against its sector) and <b>earnings</b> (20%: how strongly the stock reacted to its last report, compared with the implied move, fading over 45 days).'],
+        ['Step 3: filter the ideas', 'A high score is not enough. It passes on a stock that is not in an uptrend, reports earnings within three days, has jumped more than 8% in five days (no chasing), would push one sector above 35% of the account, or had negative news in the last three days. The log records the most interesting ideas it passed on, and why.'],
+        ['Step 4: size from the stop', 'Every new position gets a stop 2.5 ATRs from the price, placed as a real order. The size is set so that hitting the stop loses your <b>maximum risk per trade</b> (halved in Risk-off), then reduced if needed by your position limit, 2% of daily volume, buying power, the market view’s exposure limit and the sector cap. The log says which limit decided the size.'],
+        ['Step 5: manage every position daily', 'At +1R the stop moves to breakeven. At +2R it trails 3 ATRs behind the best close. At +3R it banks a third of the position. The night before earnings, a large position without a cushion is halved. If the trend breaks (a close below the 50-day average with a weak score) it exits rather than waiting for the stop. Stops only ever move in the direction of the trade.'],
+        ['Index core', 'When the market view is Risk-on or Caution but there are not enough good stock ideas, it keeps the idle cash invested in the TMXI index fund (a "core and satellite" approach). The core is sold first when the view worsens or a strong stock idea needs the cash.'],
+        ['Hedging and shorting', 'On a margin account in a Risk-off market it may short the TMXI index fund against its remaining stocks, removing much of the market risk while keeping the stock-specific bets. It may also short up to two of the weakest stocks in clear downtrends, at half size, avoiding hard-to-borrow names and imminent earnings. On a cash account it simply holds more cash.'],
+        ['Following the risk rules', 'If its own account loses more than your daily loss limit in one day, it opens nothing new the next day. If its drawdown passes 60% of your limit it halves its risk per trade, and beyond the limit it stops adding risk until it recovers.'],
+        ['The decision log', 'In the debrief, every action is listed in date order. Tap an entry to open it: the reasoning step by step, the plan and sizing maths, a table of the exact numbers it used, and <b>What happened</b>, meaning the fill price and the final result of the trade in dollars and R. Use the filters to see only market views, entries, exits, risk management or the ideas it passed on.'],
+        ['Log actions', '<b>MARKET VIEW</b> change of regime read · <b>BUY / SHORT</b> new position · <b>CORE</b> idle cash into the index fund · <b>REDUCE CORE</b> index core sold · <b>RAISE STOP</b> stop tightened · <b>TAKE PROFIT</b> a third banked · <b>TRIM</b> cut before earnings · <b>SELL / COVER</b> thesis broken or exposure too high · <b>STOP HIT</b> a stop filled during the day · <b>HEDGE / UNHEDGE</b> index short added or removed · <b>PASS</b> a good idea skipped · <b>RULES</b> a risk rule changed its behaviour.'],
+        ['Times shown', '<b>"close"</b> entries were decided after that day’s close and executed from the next open, exactly like your orders. <b>"During"</b> entries are stops or targets that filled during that trading day.'],
+        ['How to learn from it', 'Do not copy it trade by trade. Compare its <b>process</b> with yours: did it size smaller, cut losers faster, avoid earnings gambles, reduce exposure earlier in a falling market, or simply trade less? Its edge comes from risk control and consistency, not from knowing the future.'],
+        ['Its limits', 'It is a rule-based imitation of professional judgement, not a crystal ball. Tested across hundreds of simulated sessions it typically beats the index by a few percent with about half the drawdown, but it often lags in strong, steady rallies and V-shaped rebounds, because protecting capital costs some upside. Any single session can go either way.']
       ]
     },
     {
@@ -359,7 +382,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
         ['Your coach', 'Observations from your actual trades. Red is a damaging habit, amber a warning, blue information and green a strength.'],
         ['Disposition effect', 'The tendency to sell winners too early and hold losers too long. Measured the way academic researchers do: on days you sold, what share of your available gains you took versus what share of your available losses.'],
         ['Best / worst trades', 'Your three best and three worst closed trades, with their R-multiple, holding period, exit reason and thesis.'],
-        ['Review board', 'Go back to the final day’s board to inspect charts, orders and the journal. Trading is disabled.']
+        ['Review board', 'Go back to the final day\u2019s board to inspect charts, orders and the journal. Trading is disabled.'],
+        ['✕ Close', 'Closes the debrief and returns to the home screen, where you can start a new session. You can reopen this debrief from the home screen (<b>View debrief</b>) until you start another session.'],
       ]
     },
     {

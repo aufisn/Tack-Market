@@ -1,11 +1,22 @@
 // Headless tests for engine, broker, bots, analytics and game layer: node tests/core-test.js
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ctx = { console, crypto: require('crypto').webcrypto }; vm.createContext(ctx);
-for (const f of ['engine.js', 'broker.js', 'analytics.js', 'bots.js', 'game.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', f), 'utf8'), ctx, { filename: f });
+for (const f of ['engine.js', 'broker.js', 'analytics.js', 'bots.js', 'trader.js', 'game.js', 'help.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../src', f), 'utf8'), ctx, { filename: f });
 const TM = vm.runInContext('TM', ctx);
 let fails = 0;
 const ok = (cond, msg) => { if (!cond) { fails++; console.log('FAIL', msg); } };
 
+// 0. help guide: every entry must be a [term, definition] pair of strings, every section reachable
+{
+  const ids = new Set();
+  let bad = 0;
+  for (const sec of TM.HELP) {
+    ok(sec.id && !ids.has(sec.id), 'help section id unique: ' + sec.id); ids.add(sec.id);
+    sec.items.forEach((it, k) => { if (!Array.isArray(it) || it.length !== 2 || typeof it[0] !== 'string' || typeof it[1] !== 'string') { bad++; console.log('  bad help item', sec.id, k, JSON.stringify(it)); } });
+  }
+  ok(bad === 0, 'help entries well-formed (bad: ' + bad + ')');
+  for (const k in TM.HELP_CONTEXT) ok(ids.has(TM.HELP_CONTEXT[k]), 'help context target exists: ' + k);
+}
 // 1. determinism
 const w1 = TM.generateWorld({ seed: 42, scenario: 'random', sessionDays: 60 });
 const w2 = TM.generateWorld({ seed: 42, scenario: 'random', sessionDays: 60 });

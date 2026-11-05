@@ -9,7 +9,8 @@ var TM = typeof TM !== 'undefined' ? TM : {};
     { id: 'equal', label: 'Equal-weight', desc: 'Buys all 40 stocks in equal amounts on day one and holds.' },
     { id: 'momentum', label: 'Momentum bot', desc: 'Every 21 days holds the 8 stocks with the best 6-month return, skipping the last week.' },
     { id: 'value', label: 'Value bot', desc: 'Every 21 days holds the 8 stocks with the most upside to their analyst target price.' },
-    { id: 'rules', label: 'Rules bot', desc: 'Buys random stocks and exits only by your rules: stop, target, trailing stop, time limit. It tests exits, not stock picking.' }
+    { id: 'rules', label: 'Rules bot', desc: 'Buys random stocks and exits only by your rules: stop, target, trailing stop, time limit. It tests exits, not stock picking.' },
+    { id: 'trader', label: 'Market Trader', desc: 'Trades like an experienced professional using only the data you can see, your account type and your risk rules. Its full reasoning is revealed in the debrief.' }
   ];
   const DEFAULT_RULES_BOT = { stopPct: 8, targetPct: 16, trailPct: 0, maxHold: 20, posPct: 10, maxPos: 8 };
 
@@ -83,6 +84,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       } else if (id === 'momentum' && reb) rebalance(world, a, t, topN(world, 8, (i) => world.c[i][t - 5] / world.c[i][t - 126] - 1));
       else if (id === 'value' && reb) rebalance(world, a, t, topN(world, 8, (i) => world.tgt[i][t] / world.c[i][t] - 1));
       else if (id === 'rules') rulesBot(world, a, t, game.botCfg || DEFAULT_RULES_BOT, game.seed);
+      else if (id === 'trader') TM.marketTrader(world, game, t);
     }
   }
 

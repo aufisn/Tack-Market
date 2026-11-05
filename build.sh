@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 OUT=index.html
-JS="src/engine.js src/broker.js src/analytics.js src/bots.js src/game.js src/help.js src/ui.js"
+JS="src/engine.js src/broker.js src/analytics.js src/bots.js src/trader.js src/game.js src/help.js src/ui.js"
 if grep -n '</script' $JS; then echo "error: '</script' found in JS source" >&2; exit 1; fi
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in

@@ -242,7 +242,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       id: acct.nextTradeId++, sym, dir, openDay: d, closeDay: null, entryPx: px, entryQty: 0, qtyMax: 0, realized: 0, fees: 0, divs: 0, borrow: 0,
       plannedStop: order && order.plannedStop || null, plannedTarget: order && order.plannedTarget || null,
       tag: order && order.tag || '', note: order && order.note || '', lesson: '', exits: [], adds: 0, mae: 0, mfe: 0,
-      chase: !!(order && order.flags && order.flags.chase), exitReason: null
+      chase: !!(order && order.flags && order.flags.chase), exitReason: null, openOrderId: order && order.id || null
     };
     acct.openTrades[sym] = tr;
     return tr;
@@ -268,7 +268,7 @@ var TM = typeof TM !== 'undefined' ? TM : {};
       const pnl = (px - p.avg) * closeQty * Math.sign(p.qty);
       acct.realized += pnl;
       const tr = acct.openTrades[sym];
-      if (tr) { tr.realized += pnl; tr.fees += comm; tr.exits.push({ d, qty: closeQty, px, reason }); }
+      if (tr) { tr.realized += pnl; tr.fees += comm; tr.exits.push({ d, qty: closeQty, px, reason, orderId: order && order.id || null }); }
       comm = 0;
       p.qty += Math.sign(dq) * closeQty;
       rem = dq - Math.sign(dq) * closeQty;
