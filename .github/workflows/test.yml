@@ -23,5 +23,7 @@ jobs:
           fi
       - name: Core tests (engine, broker, bots, analytics, game)
         run: node tests/core-test.js
+      - name: Market Trader tests (no look-ahead, rules, scenarios)
+        run: node tests/trader-test.js
       - name: Market calibration report
         run: node tests/calibrate.js
